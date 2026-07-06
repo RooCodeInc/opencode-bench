@@ -69,6 +69,9 @@ function ensureProviders(): ProviderBundle {
       apiKey,
       baseURL,
       name: "opencode",
+      // Send response_format json_schema so generateObject gets structured
+      // judge verdicts instead of free text that fails to parse.
+      supportsStructuredOutputs: true,
     }),
     anthropic: createAnthropic({
       apiKey,
