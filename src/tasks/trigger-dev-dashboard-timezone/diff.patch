@@ -1,0 +1,237 @@
+diff --git a/.server-changes/dashboard-timezone.md b/.server-changes/dashboard-timezone.md
+new file mode 100644
+index 00000000000..2cb106f9466
+--- /dev/null
++++ b/.server-changes/dashboard-timezone.md
+@@ -0,0 +1,6 @@
++---
++area: webapp
++type: fix
++---
++
++Fix the date/time tooltip's timezone offset label so it always matches the displayed local time, including across daylight saving boundaries, and let users whose browser reports UTC or an alias zone (e.g. Etc/UTC, Asia/Kolkata) save their timezone preference instead of it silently failing.
+diff --git a/apps/webapp/app/components/primitives/DateTime.tsx b/apps/webapp/app/components/primitives/DateTime.tsx
+index 41c51cdd74d..355af397a11 100644
+--- a/apps/webapp/app/components/primitives/DateTime.tsx
++++ b/apps/webapp/app/components/primitives/DateTime.tsx
+@@ -178,6 +178,31 @@ export function formatDateTimeISO(date: Date, timeZone: string): string {
+   );
+ }
+ 
++/**
++ * Human-readable UTC offset for a timezone at a specific instant, e.g. "(UTC +3)".
++ * Returns "" for UTC. The offset must be derived from the same (date, timeZone) pair
++ * used to render the displayed time so the label always matches the value shown — and
++ * so it stays correct across DST boundaries regardless of the viewer's current season.
++ */
++export function formatUtcOffset(date: Date, timeZone: string): string {
++  if (timeZone === "UTC") return "";
++
++  const parts = new Intl.DateTimeFormat("en-US", {
++    timeZone,
++    timeZoneName: "longOffset",
++  }).formatToParts(date);
++
++  // longOffset yields "GMT+03:00", "GMT-08:00", "GMT+05:30", or "GMT" for UTC-equivalent zones.
++  const raw = parts.find((part) => part.type === "timeZoneName")?.value.replace("GMT", "") ?? "";
++  const match = raw.match(/^([+-])(\d{2}):(\d{2})$/);
++  if (!match) return "(UTC +0)";
++
++  const [, sign, hh, mm] = match;
++  const hours = parseInt(hh, 10);
++  const minutes = parseInt(mm, 10);
++  return `(UTC ${sign}${hours}${minutes ? `:${minutes.toString().padStart(2, "0")}` : ""})`;
++}
++
+ // New component that only shows date when it changes
+ export const SmartDateTime = ({ date, previousDate = null, hour12 = true }: DateTimeProps) => {
+   const locales = useLocales();
+@@ -445,6 +470,7 @@ type DateTimeTooltipContentProps = {
+   dateTime: string;
+   isoDateTime: string;
+   icon: ReactNode;
++  offset?: string;
+ };
+ 
+ function DateTimeTooltipContent({
+@@ -452,25 +478,14 @@ function DateTimeTooltipContent({
+   dateTime,
+   isoDateTime,
+   icon,
++  offset,
+ }: DateTimeTooltipContentProps) {
+-  const getUtcOffset = useMemo(
+-    () => () => {
+-      if (title !== "Local") return "";
+-      const offset = -new Date().getTimezoneOffset();
+-      const sign = offset >= 0 ? "+" : "-";
+-      const hours = Math.abs(Math.floor(offset / 60));
+-      const minutes = Math.abs(offset % 60);
+-      return `(UTC ${sign}${hours}${minutes ? `:${minutes.toString().padStart(2, "0")}` : ""})`;
+-    },
+-    [title]
+-  );
+-
+   return (
+     <div className="flex flex-col gap-1">
+       <div className="flex items-center gap-1 text-sm">
+         {icon}
+         <span className="font-medium">{title}</span>
+-        <span className="font-normal text-text-dimmed">{getUtcOffset()}</span>
++        {offset ? <span className="font-normal text-text-dimmed">{offset}</span> : null}
+       </div>
+       <div className="flex items-center justify-between gap-2">
+         <Paragraph variant="extra-small" className="text-text-dimmed">
+@@ -515,6 +530,7 @@ function TooltipContent({
+           dateTime={formatDateTime(realDate, localTimeZone, locales, true, true, true)}
+           isoDateTime={formatDateTimeISO(realDate, localTimeZone)}
+           icon={<Laptop className="size-4 text-green-500" />}
++          offset={formatUtcOffset(realDate, localTimeZone)}
+         />
+       </div>
+     </div>
+diff --git a/apps/webapp/app/routes/resources.timezone.ts b/apps/webapp/app/routes/resources.timezone.ts
+index f06b44e6149..de90b5036f8 100644
+--- a/apps/webapp/app/routes/resources.timezone.ts
++++ b/apps/webapp/app/routes/resources.timezone.ts
+@@ -4,14 +4,12 @@ import {
+   setTimezonePreference,
+   uiPreferencesStorage,
+ } from "~/services/preferences/uiPreferences.server";
++import { isValidTimeZone } from "~/utils/timezones.server";
+ 
+ const schema = z.object({
+   timezone: z.string().min(1).max(100),
+ });
+ 
+-// Cache the supported timezones to avoid repeated calls
+-const supportedTimezones = new Set(Intl.supportedValuesOf("timeZone"));
+-
+ export async function action({ request }: ActionFunctionArgs) {
+   let data: unknown;
+   try {
+@@ -26,7 +24,7 @@ export async function action({ request }: ActionFunctionArgs) {
+     return json({ success: false, error: "Invalid timezone" }, { status: 400 });
+   }
+ 
+-  if (!supportedTimezones.has(result.data.timezone)) {
++  if (!isValidTimeZone(result.data.timezone)) {
+     return json({ success: false, error: "Invalid timezone" }, { status: 400 });
+   }
+ 
+diff --git a/apps/webapp/app/utils/timezones.server.ts b/apps/webapp/app/utils/timezones.server.ts
+index a2d3b83d2ef..5080502da04 100644
+--- a/apps/webapp/app/utils/timezones.server.ts
++++ b/apps/webapp/app/utils/timezones.server.ts
+@@ -5,3 +5,18 @@ export function getTimezones(includeUtc = true) {
+   }
+   return possibleTimezones;
+ }
++
++/**
++ * Whether the runtime can resolve this IANA timezone. Prefer this over checking membership
++ * in `Intl.supportedValuesOf("timeZone")`, which lists only canonical ids and omits zones
++ * browsers legitimately report (e.g. "UTC", "Etc/UTC", "Asia/Kolkata") — rejecting those
++ * would leave a client's stored timezone stale.
++ */
++export function isValidTimeZone(timeZone: string): boolean {
++  try {
++    new Intl.DateTimeFormat("en-US", { timeZone });
++    return true;
++  } catch {
++    return false;
++  }
++}
+diff --git a/apps/webapp/test/components/DateTime.test.ts b/apps/webapp/test/components/DateTime.test.ts
+index 103f416eb9f..68c806f5d2e 100644
+--- a/apps/webapp/test/components/DateTime.test.ts
++++ b/apps/webapp/test/components/DateTime.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, it, expect } from "vitest";
+-import { formatDateTimeISO } from "~/components/primitives/DateTime";
++import { formatDateTimeISO, formatUtcOffset } from "~/components/primitives/DateTime";
+ 
+ describe("formatDateTimeISO", () => {
+   it("should format UTC dates with Z suffix", () => {
+@@ -52,3 +52,45 @@ describe("formatDateTimeISO", () => {
+     expect(result).toBe("2025-04-29T15:01:19.123+01:00");
+   });
+ });
++
++describe("formatUtcOffset", () => {
++  const date = new Date("2026-06-30T13:16:26.000Z");
++
++  it("returns an empty string for UTC", () => {
++    expect(formatUtcOffset(date, "UTC")).toBe("");
++  });
++
++  it("returns an empty offset for UTC-equivalent zones", () => {
++    expect(formatUtcOffset(date, "Atlantic/Reykjavik")).toBe("(UTC +0)");
++  });
++
++  // The reported bug: the offset label must reflect the displayed timezone, not the
++  // viewer's machine. A viewer on a UTC machine looking at a UTC+3 zone must see +3.
++  it("reflects the timezone being displayed, not the viewer's machine", () => {
++    expect(formatUtcOffset(date, "Europe/Moscow")).toBe("(UTC +3)");
++  });
++
++  it("formats half-hour offsets", () => {
++    expect(formatUtcOffset(date, "Asia/Kolkata")).toBe("(UTC +5:30)");
++  });
++
++  it("formats negative offsets", () => {
++    expect(formatUtcOffset(date, "America/Los_Angeles")).toBe("(UTC -7)");
++  });
++
++  // The offset is derived from the given instant, so it stays correct across DST
++  // boundaries regardless of what season the viewer is currently in.
++  describe("is DST-aware for the given instant", () => {
++    it("uses +0 for a London winter date", () => {
++      expect(formatUtcOffset(new Date("2026-01-15T12:00:00.000Z"), "Europe/London")).toBe(
++        "(UTC +0)"
++      );
++    });
++
++    it("uses +1 for a London summer date", () => {
++      expect(formatUtcOffset(new Date("2026-07-15T12:00:00.000Z"), "Europe/London")).toBe(
++        "(UTC +1)"
++      );
++    });
++  });
++});
+diff --git a/apps/webapp/test/utils/timezones.test.ts b/apps/webapp/test/utils/timezones.test.ts
+new file mode 100644
+index 00000000000..7664c233438
+--- /dev/null
++++ b/apps/webapp/test/utils/timezones.test.ts
+@@ -0,0 +1,30 @@
++import { describe, expect, it } from "vitest";
++import { isValidTimeZone } from "~/utils/timezones.server";
++
++describe("isValidTimeZone", () => {
++  // These are all zones a browser can report via
++  // Intl.DateTimeFormat().resolvedOptions().timeZone, but which are NOT in
++  // Intl.supportedValuesOf("timeZone"). Rejecting them left the user's stored
++  // timezone stale (their preference update would 400).
++  it.each(["UTC", "Etc/UTC", "GMT", "Asia/Kolkata"])(
++    "accepts %s even though it is not in supportedValuesOf",
++    (tz) => {
++      expect(Intl.supportedValuesOf("timeZone").includes(tz)).toBe(false);
++      expect(isValidTimeZone(tz)).toBe(true);
++    }
++  );
++
++  it.each(["Europe/London", "Europe/Moscow", "America/New_York", "Asia/Calcutta"])(
++    "accepts canonical zone %s",
++    (tz) => {
++      expect(isValidTimeZone(tz)).toBe(true);
++    }
++  );
++
++  it.each(["", "Not/AZone", "Mars/Phobos", "Europe/Nowhere", "12345"])(
++    "rejects invalid zone %s",
++    (tz) => {
++      expect(isValidTimeZone(tz)).toBe(false);
++    }
++  );
++});

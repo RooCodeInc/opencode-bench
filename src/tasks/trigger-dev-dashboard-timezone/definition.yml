@@ -1,0 +1,17 @@
+source:
+  repo: triggerdotdev/trigger.dev
+  from: fd4f02b2f85cf68196476141d220277084c5c79b
+  to: 6563793132df2fc10499690cef5ff2359dac72bd
+context: >
+  Dashboard timestamps ignore the user's selected timezone in several places,
+  and the timezone preference does not persist across sessions. Ask for
+  consistent timezone display and persistence of the preference.
+metrics:
+  - name: api-signature
+    weight: 0.2
+  - name: logic-equivalence
+    weight: 0.3
+  - name: integration-points
+    weight: 0.3
+  - name: test-coverage
+    weight: 0.2

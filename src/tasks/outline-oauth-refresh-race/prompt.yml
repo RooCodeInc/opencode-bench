@@ -1,0 +1,4 @@
+generated_at: 2026-07-06T16:53:46.046Z
+prompts:
+  - commit: 4c36bd83dee73ffc4fe41cdd0c68008e4d57a29b
+    prompt: "Prevent concurrent OAuth refresh token requests from revoking the entire grant. When multiple requests attempt to refresh the same token simultaneously, the current implementation treats the replay as token reuse and revokes all authentications in the grant. Introduce a grace period during which recently rotated tokens can be replayed without triggering revocation—this allows parallel refresh attempts to fail gracefully while preserving the grant won by the first request. Replays outside this window should still be treated as genuine reuse and trigger full grant revocation. Add comprehensive test coverage for both scenarios: replays within the grace period (concurrent requests) and replays outside it (actual reuse). Follow existing patterns for time-based logic and authentication handling."
