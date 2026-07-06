@@ -150,6 +150,9 @@ export namespace Eval {
         task: taskId,
         model: modelId,
         agent: agentName,
+        // Keep the agent's diff so result viewers can show it next to the
+        // reference diff the judges compared against.
+        diff,
         score: {
           final: score,
           base: weightedAvg,
