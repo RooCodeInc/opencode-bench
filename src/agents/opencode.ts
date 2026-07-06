@@ -14,7 +14,7 @@ const opencodeConfig = {
     webfetch: "allow",
     external_directory: "allow",
   },
-  share: "auto",
+  share: "disabled",
   provider: {
     opencode: {
       options: {
@@ -48,6 +48,11 @@ export const models: string[] = [
   "opencode/kimi-k2",
   "opencode/grok-code",
   "opencode/alpha-gd4",
+  // Extra models (e.g. openrouter/openai/gpt-5.4) can be registered via env
+  // without editing this file: OPENCODE_BENCH_EXTRA_MODELS="a/b,c/d"
+  ...(process.env.OPENCODE_BENCH_EXTRA_MODELS?.split(",")
+    .map((m) => m.trim())
+    .filter(Boolean) ?? []),
 ];
 
 function sessionKey(model: string, cwd: string): string {
@@ -89,7 +94,11 @@ const opencodeAgent: Agent.Definition = {
     }
 
     options.logger.log(`Prompting session ${sessionID}...`);
-    const [providerID, modelID] = model.split("/");
+    // Model IDs may contain slashes in the model part (e.g. openrouter/openai/gpt-5.4),
+    // so only split on the first slash.
+    const slashIndex = model.indexOf("/");
+    const providerID = model.slice(0, slashIndex);
+    const modelID = model.slice(slashIndex + 1);
     const actions: string[] = [];
     const usage = {
       input: 0,

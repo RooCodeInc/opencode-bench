@@ -34,6 +34,7 @@
     "@opencode-ai/sdk": "^1.0.108",
     "ai": "^5.0.64",
     "detect-port": "^2.1.0",
+    "opencode-ai": "1.17.8",
     "yaml": "^2.4.5",
     "yargs": "^18.0.0",
     "zod": "^3.23.8"
