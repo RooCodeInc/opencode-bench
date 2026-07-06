@@ -26,7 +26,11 @@ export namespace Eval {
       logger: Logger.Instance;
     },
   ) {
-    const timeoutMins = 20;
+    // The timeout covers the whole episode including judging; slow judge
+    // models can need more headroom than upstream's 20 minutes.
+    const timeoutMins =
+      Number.parseInt(process.env.OPENCODE_BENCH_EPISODE_TIMEOUT_MINS ?? "", 10) ||
+      20;
     opts.logger.log(`Starting episode with ${timeoutMins}min timeout...`);
     return await withRetries(
       () => runOnce(agentName, modelId, taskId, { logger: opts.logger }),
