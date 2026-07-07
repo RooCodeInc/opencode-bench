@@ -291,6 +291,8 @@ export namespace Eval {
       const { object } = await generateObject({
         model: getZenLanguageModel(judge),
         schema: z.object({
+          // No .max() here: Anthropic structured outputs reject maxItems;
+          // the prompt asks for 3-10 items and we truncate defensively below.
           checklist: z
             .array(
               z.object({
@@ -298,8 +300,7 @@ export namespace Eval {
                 satisfied: z.boolean(),
               }),
             )
-            .min(1)
-            .max(15),
+            .min(1),
           rationale: z.string().min(1),
         }),
         system: c.systemPrompt,
@@ -314,11 +315,12 @@ export namespace Eval {
         throw new Error("Score evaluators must include a rationale string.");
 
       // The score is the fraction of reference-derived expectations satisfied.
-      const satisfied = object.checklist.filter((c) => c.satisfied).length;
+      const checklist = object.checklist.slice(0, 15);
+      const satisfied = checklist.filter((c) => c.satisfied).length;
       const result = {
-        score: satisfied / object.checklist.length,
+        score: satisfied / checklist.length,
         rationale: object.rationale,
-        checklist: object.checklist,
+        checklist,
       };
 
       opts.logger.log("Judge result:", result);
