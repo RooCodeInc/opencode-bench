@@ -9,9 +9,9 @@ context: >
   free of implementation specifics.
 metrics:
   - name: api-signature
-    weight: 0.2
+    weight: 0.1
   - name: logic-equivalence
-    weight: 0.3
+    weight: 0.4
   - name: integration-points
     weight: 0.3
   - name: test-coverage

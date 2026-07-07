@@ -1,4 +1,0 @@
-generated_at: 2026-07-06T16:53:52.586Z
-prompts:
-  - commit: 6563793132df2fc10499690cef5ff2359dac72bd
-    prompt: Fix dashboard timezone display and preference persistence. The timezone offset label in date/time tooltips must reflect the actual timezone being displayed (not the viewer's machine timezone) and must be calculated from the specific instant being shown so it remains correct across daylight saving boundaries. Additionally, allow users whose browsers report UTC or non-canonical timezone identifiers (such as Etc/UTC, GMT, or Asia/Kolkata) to successfully save their timezone preference—the validation was incorrectly rejecting these legitimate zones. Follow existing patterns for datetime formatting and validation. Include test coverage verifying the offset calculation works correctly for various timezones and DST transitions, and that timezone validation accepts both canonical and non-canonical but valid IANA identifiers.

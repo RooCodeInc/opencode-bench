@@ -1,4 +1,0 @@
-generated_at: 2026-07-06T16:53:27.163Z
-prompts:
-  - commit: 4e529cbad1e8ab3959cf1f62404bf6e9c6853701
-    prompt: Fix the admin users table so infinite scroll loads additional rows reliably as the user scrolls. The table should display a count of loaded vs. total users, show a loading state initially, and trigger pagination when the user scrolls near the bottom of the container. Ensure the scroll handler receives the necessary context to detect when more data should be fetched. Add comprehensive test coverage for the pagination logic including search filtering (case-insensitive username and email), handling of locked/unlocked users, limit enforcement, cursor-based pagination, and edge cases like empty results. The implementation should follow existing patterns in the codebase for data fetching and state management.

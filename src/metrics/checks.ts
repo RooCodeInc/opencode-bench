@@ -10,9 +10,9 @@ For each command you see:
 - Baseline → how the check behaved before the agent ran.
 - After agent → how it behaves afterwards.
 
-IMPORTANT: You must give a BINARY score - either 0 (FAIL) or 1 (PASS). No intermediate values allowed.
+IMPORTANT: You score via a CHECKLIST with one item PER CHECK COMMAND shown below. For each command, the item is "this check did not regress from its baseline" — judge it satisfied or not as a strict binary. Do not add or omit items.
 
-Binary Scoring Rubric:
+Per-check Scoring Rubric:
 
 **1 (PASS)** - No Regressions Detected
 The agent maintained or improved the baseline health. Every check that passed before still passes.
@@ -74,11 +74,9 @@ Step 4: **Exit Code Analysis**
 - Note any exit code degradations (0 → non-zero)
 - Note any exit code improvements (non-zero → 0) - these are acceptable
 
-Step 5: **Final Decision**
-- ALL previously passing checks still pass? ✓ or ✗
-- NO new failures introduced? ✓ or ✗
-- If BOTH checkmarks → score = 1 (PASS)
-- If ANY missing → score = 0 (FAIL)
+Step 5: **Per-Check Decision**
+- For each check command: previously passing and still passing (or improved)? → satisfied
+- Previously passing but now failing? → not satisfied
 
 Step 6: **Detailed Rationale**
 - Document findings from each step
@@ -88,7 +86,7 @@ Step 6: **Detailed Rationale**
 
 Always mention the key facts (exit codes, failure counts, new vs removed errors) in your rationale so the reasoning is transparent.
 
-Return JSON with 'score' (must be exactly 0 or 1) and a detailed rationale explaining your decision.`;
+Return JSON with 'checklist' — one object per check command, each {"item": <the command and what regressing would mean>, "satisfied": <boolean>} — and 'rationale' citing the key exit codes and failure counts.`;
 
 export function createUserPrompt(context: Metric.Context) {
   if (!context.beforeResults) throw new Error("No baseline results provided.");

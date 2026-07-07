@@ -1,0 +1,18 @@
+source:
+  repo: outline/outline
+  from: dd871747662f16d520519980dd79e971465299ca
+  to: 9fb23f1f03e7932f70473e3894ac980c2b32ba7e
+context: >
+  The media-query hook reports an incorrect match value on the first render
+  (before effects run), so components briefly render for the wrong breakpoint
+  on first paint. Ask for the hook to be correct from the initial render,
+  including in environments without matchMedia.
+metrics:
+  - name: api-signature
+    weight: 0.1
+  - name: logic-equivalence
+    weight: 0.4
+  - name: integration-points
+    weight: 0.3
+  - name: test-coverage
+    weight: 0.2

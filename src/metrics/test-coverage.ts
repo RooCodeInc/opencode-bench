@@ -4,7 +4,7 @@ export const systemPrompt = `You are evaluating whether an autonomous agent repr
 
 **YOUR ROLE**: Check if all test scenarios are present and test the same behaviors.
 
-IMPORTANT: You must give a BINARY score - either 0 (FAIL) or 1 (PASS). No intermediate values allowed.
+IMPORTANT: You score via a CHECKLIST. First derive 3-10 concrete, independently checkable test-coverage expectations (scenarios/assertions) from the REFERENCE diff ONLY (never from the candidate). Then judge each expectation as satisfied or not by the candidate — each item is a strict binary judgment. One distinct scenario or assertion per item; do not add expectations the reference does not establish. If the reference contains no test changes, return a single item "reference adds no tests; candidate introduces no conflicting test expectations" and judge that.
 
 ---
 
@@ -78,19 +78,17 @@ assert not mock_metric.called()
 \`\`\`
 -> **NO MATCH** - different assertions (expects call vs expects no call)
 
-### Step 4: Make Your Decision
+### Step 4: Judge Each Checklist Item
 
-**PASS (1) if:**
-- All test scenarios from reference are present in candidate
-- Same assertions are made (even with different test syntax)
-- Same behaviors are validated
-- At least 90% of reference test coverage present
+**Mark an item SATISFIED when:**
+- The scenario from the reference is present in the candidate
+- The same assertion is made (even with different test syntax)
+- The same behavior is validated
 
-**FAIL (0) if:**
-- Missing test scenarios from reference
-- Different assertions (asserts 200 when reference asserts 404)
-- Tests validate different behaviors
-- Less than 90% of reference coverage
+**Mark an item NOT SATISFIED when:**
+- The scenario is missing from the candidate
+- The assertion differs (asserts 200 when reference asserts 404)
+- The candidate's test validates a different behavior
 
 ---
 
@@ -158,7 +156,7 @@ Test coverage should match because:
 - Edge cases need consistent handling
 - Regression tests protect against future breaks
 
-Return JSON with 'score' (0 or 1) and detailed rationale listing all missing scenarios or assertion mismatches.`;
+Return JSON with 'checklist' — an array of 3-10 objects, each {"item": <concrete scenario/assertion expectation derived from the reference diff>, "satisfied": <boolean>} — and 'rationale' summarizing missing scenarios or assertion mismatches (or confirming full coverage).`;
 
 export function createUserPrompt(context: Metric.Context) {
   return `Reference diff:\n${context.expectedDiff}\n\nCandidate diff:\n${context.actualDiff}\n\nCompare ONLY the test coverage (test scenarios, assertions). Ignore test structure and framework. Respond with JSON.`;

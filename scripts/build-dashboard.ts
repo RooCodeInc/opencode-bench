@@ -169,16 +169,21 @@ window.showDetail = (model, task) => {
         const judges = s.judges.map((j, ji) =>
           "<button class='judge " + (j.score >= 0.5 ? "pass" : "fail") + "' " +
           "onclick='toggleRationale(" + i + "," + si + "," + ji + ")'>" +
-          esc(j.judge.split("/").pop()) + " " + j.score.toFixed(0) + "</button>"
+          esc(j.judge.split("/").pop()) + " " + j.score.toFixed(2) + "</button>"
         ).join(" ");
-        const rats = s.judges.map((j, ji) =>
-          "<div class='rationale' id='rat-" + i + "-" + si + "-" + ji +
-          "' style='display:none'><b>" + esc(j.judge) + ":</b> " +
-          esc(j.rationale || "(no rationale)") + "</div>"
-        ).join("");
+        const rats = s.judges.map((j, ji) => {
+          const items = (j.checklist || []).map(c =>
+            "<div>" + (c.satisfied ? "✓" : "✗") + " " + esc(c.item) + "</div>"
+          ).join("");
+          return "<div class='rationale' id='rat-" + i + "-" + si + "-" + ji +
+            "' style='display:none'><b>" + esc(j.judge) + ":</b> " +
+            esc(j.rationale || "(no rationale)") +
+            (items ? "<div style='margin-top:.4rem'>" + items + "</div>" : "") +
+            "</div>";
+        }).join("");
         return "<div class='crit'><div class='crit-row'><span class='crit-name'>" +
           esc(s.criterion) + " (w " + s.weight + ")</span>" + judges +
-          (s.variance > 0 ? " <span style='color:var(--mid)'>disagreement</span>" : "") +
+          (s.variance > 0.02 ? " <span style='color:var(--mid)'>disagreement</span>" : "") +
           "</div>" + rats + "</div>";
       }).join("");
       const diffs = (r.diff || meta.referenceDiff) ?

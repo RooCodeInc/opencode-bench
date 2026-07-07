@@ -4,7 +4,7 @@ export const systemPrompt = `You are evaluating whether an autonomous agent inte
 
 **YOUR ROLE**: Check if functions are called from the same locations and in the same way.
 
-IMPORTANT: You must give a BINARY score - either 0 (FAIL) or 1 (PASS). No intermediate values allowed.
+IMPORTANT: You score via a CHECKLIST. First derive 3-10 concrete, independently checkable integration expectations from the REFERENCE diff ONLY (never from the candidate). Then judge each expectation as satisfied or not by the candidate — each item is a strict binary judgment. One distinct integration point per item; do not add expectations the reference does not establish.
 
 ---
 
@@ -80,15 +80,15 @@ def _after(self, event, context) {
 \`\`\`
 -> **NO MATCH** - called at different point in execution flow
 
-### Step 3: Make Your Decision
+### Step 3: Judge Each Checklist Item
 
-**PASS (1) if:**
+**Mark an item SATISFIED when:**
 - Functions imported in same files
 - Functions called from same locations
 - Calls happen at approximately the same point in execution flow
 - Arguments passed are semantically the same
 
-**FAIL (0) if:**
+**Mark an item NOT SATISFIED when:**
 - Functions imported in different files
 - Functions called from different locations
 - Calls happen at significantly different points in flow
@@ -161,7 +161,7 @@ Integration points should match because:
 - Missing integrations mean features aren't activated
 - Wrong locations can cause race conditions
 
-Return JSON with 'score' (0 or 1) and detailed rationale listing all integration mismatches found.`;
+Return JSON with 'checklist' — an array of 3-10 objects, each {"item": <concrete integration expectation derived from the reference diff>, "satisfied": <boolean>} — and 'rationale' summarizing the most important mismatches (or confirming full coverage).`;
 
 export function createUserPrompt(context: Metric.Context) {
   return `Reference diff:\n${context.expectedDiff}\n\nCandidate diff:\n${context.actualDiff}\n\nCompare ONLY the integration points (imports, function calls, call locations, timing). Ignore implementation details. Respond with JSON.`;

@@ -256,9 +256,15 @@ export namespace Eval {
       const { object } = await generateObject({
         model: getZenLanguageModel(judge),
         schema: z.object({
-          score: z.number().refine((val) => val === 0 || val === 1, {
-            message: "Score must be binary: 0 (fail) or 1 (pass)",
-          }),
+          checklist: z
+            .array(
+              z.object({
+                item: z.string().min(1),
+                satisfied: z.boolean(),
+              }),
+            )
+            .min(1)
+            .max(15),
           rationale: z.string().min(1),
         }),
         system: c.systemPrompt,
@@ -267,17 +273,21 @@ export namespace Eval {
       });
       if (!object || typeof object !== "object")
         throw new Error("Score evaluators must return an object.");
-      if (typeof object.score !== "number")
-        throw new Error("Score evaluators must return a number.");
+      if (!Array.isArray(object.checklist) || object.checklist.length === 0)
+        throw new Error("Score evaluators must return a non-empty checklist.");
       if (typeof object.rationale !== "string" || object.rationale.length === 0)
         throw new Error("Score evaluators must include a rationale string.");
-      if (object.score < 0 || object.score > 1)
-        throw new Error(
-          "Score evaluators must return a score between 0 and 1.",
-        );
 
-      opts.logger.log("Judge result:", object);
-      return object;
+      // The score is the fraction of reference-derived expectations satisfied.
+      const satisfied = object.checklist.filter((c) => c.satisfied).length;
+      const result = {
+        score: satisfied / object.checklist.length,
+        rationale: object.rationale,
+        checklist: object.checklist,
+      };
+
+      opts.logger.log("Judge result:", result);
+      return result;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("Failed to judge score:", msg);
