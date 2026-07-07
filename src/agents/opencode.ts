@@ -105,8 +105,21 @@ const opencodeAgent: Agent.Definition = {
       output: 0,
       cost: 0,
     };
+    // Strong models can grind on a task for a very long time. Bound the agent
+    // phase and let the caller score whatever is on disk at the cutoff — a
+    // real time budget — instead of discarding the whole episode.
+    const agentTimeoutMs =
+      (Number.parseInt(
+        process.env.OPENCODE_BENCH_AGENT_TIMEOUT_MINS ?? "",
+        10,
+      ) || 15) *
+      60 *
+      1000;
+    const TIMED_OUT = Symbol("agent-timeout");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     try {
-      const { data, error } = await opencode.client.session.prompt({
+      const promptPromise = opencode.client.session.prompt({
         path: { id: sessionID! },
         query: { directory: options.cwd },
         body: {
@@ -118,6 +131,33 @@ const opencodeAgent: Agent.Definition = {
         },
       });
 
+      const raced = await Promise.race([
+        promptPromise,
+        new Promise<typeof TIMED_OUT>((resolve) => {
+          timer = setTimeout(() => resolve(TIMED_OUT), agentTimeoutMs);
+        }),
+      ]);
+
+      if (raced === TIMED_OUT) {
+        options.logger.log(
+          `Agent hit the ${agentTimeoutMs / 60000}min budget; aborting session and scoring current work tree.`,
+        );
+        try {
+          await opencode.client.session.abort({
+            path: { id: sessionID! },
+            query: { directory: options.cwd },
+          });
+        } catch (e) {
+          options.logger.error("Failed to abort session:", e);
+        }
+        sessionCache.delete(cacheKey);
+        actions.push(
+          JSON.stringify({ aborted: "agent time budget reached" }),
+        );
+        return { actions, usage };
+      }
+
+      const { data, error } = raced;
       if (error) throw error;
       options.logger.debug(`Data: ${JSON.stringify(data)}`);
 
@@ -138,6 +178,8 @@ const opencodeAgent: Agent.Definition = {
       sessionCache.delete(cacheKey);
       options.logger.error("Error in opencode agent: ", error);
       throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
 
     return { actions, usage };
