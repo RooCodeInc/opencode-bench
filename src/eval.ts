@@ -97,8 +97,43 @@ export namespace Eval {
 
       opts.logger.log(`Scoring...`);
       await finalizeChanges(task.source.from);
-      const diff = await generateDiff(task.source.from);
+
+      // An empty work tree at scoring time is a legitimate submission that
+      // scores 0 (the agent shipped nothing within its budget) — throwing
+      // here would burn full retries on a deterministic outcome.
+      let diff = "";
+      try {
+        diff = await generateDiff(task.source.from);
+      } catch {
+        opts.logger.log(
+          "No changes to score; recording a zero-score episode without judging.",
+        );
+      }
+
       const allScores = [];
+      if (diff.length === 0) {
+        for (const { name, weight } of task.metrics) {
+          allScores.push({
+            criterion: name,
+            weight,
+            average: 0,
+            variance: 0,
+            judges: [],
+          });
+        }
+        return {
+          task: taskId,
+          model: modelId,
+          agent: agentName,
+          diff,
+          score: { final: 0, base: 0, penalty: 0 },
+          scoreDetails: allScores,
+          actions,
+          usage,
+          duration,
+        };
+      }
+
       for (const { name, weight, args } of task.metrics) {
         const cl = opts.logger.child(`[metric ${name}]`);
         const afterResults = args
