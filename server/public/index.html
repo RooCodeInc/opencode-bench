@@ -12,14 +12,14 @@
   .matrix-scroll { overflow-x: auto; }
   table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; }
   .matrix th, .matrix td { border: 1px solid color-mix(in oklab, currentColor 12%, transparent);
-    border-width: 0 1px 1px 0; padding: .45rem .6rem; text-align: center;
-    min-width: 6.5rem; font-variant-numeric: tabular-nums; }
+    border-width: 0 1px 1px 0; padding: .3rem .45rem; text-align: center;
+    min-width: 5rem; font-variant-numeric: tabular-nums; font-size: .82rem; }
   .matrix tr:first-child th { border-top-width: 1px; }
   .matrix th.task, .matrix td.task { border-left-width: 1px; }
-  .matrix th { font-weight: 600; font-size: .78rem; }
+  .matrix th { font-weight: 600; font-size: .72rem; overflow-wrap: anywhere; }
   .matrix th.task, .matrix td.task { text-align: left; position: sticky; left: 0;
-    z-index: 1; min-width: 11rem; max-width: 14rem; font-size: .8rem;
-    background: var(--color-base-200); }
+    z-index: 1; min-width: 9rem; max-width: 12rem; font-size: .75rem;
+    overflow-wrap: anywhere; background: var(--color-base-200); }
   .cell { cursor: pointer; }
   .cell:hover { outline: 2px solid var(--color-primary); outline-offset: -2px; }
   .cell .eps { display: block; opacity: .65; font-size: .68rem; }
@@ -37,24 +37,24 @@
   <div class="flex-none text-sm opacity-70 tabular-nums" id="spend"></div>
 </div>
 
-<main class="p-4 lg:p-6 grid gap-4 lg:gap-6 lg:grid-cols-[400px_minmax(0,1fr)] max-w-[1700px] mx-auto">
+<main class="p-3 lg:p-4 grid gap-3 lg:gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
 
   <!-- left: launcher + runs -->
-  <div class="flex flex-col gap-4 lg:gap-6">
+  <div class="flex flex-col gap-3 lg:gap-4">
     <div class="card bg-base-200 shadow-sm">
-      <div class="card-body gap-4">
-        <h2 class="card-title text-base">New run</h2>
+      <div class="card-body p-4 gap-3 grid md:grid-cols-2 lg:grid-cols-1 md:items-start">
+        <h2 class="card-title text-base md:col-span-2 lg:col-span-1">New run</h2>
         <label class="form-control w-full">
-          <div class="label pb-1"><span class="label-text opacity-70">Models — one per line, provider/model</span></div>
-          <textarea id="models" rows="5" class="textarea textarea-bordered font-mono text-xs leading-5 w-full"></textarea>
+          <div class="label py-1"><span class="label-text text-xs opacity-70">Models — one per line, provider/model</span></div>
+          <textarea id="models" rows="4" class="textarea textarea-bordered font-mono text-xs leading-5 w-full"></textarea>
         </label>
-        <div>
-          <div class="label pb-1"><span class="label-text opacity-70">Tasks</span></div>
-          <div id="tasks" class="flex flex-col gap-1 max-h-56 overflow-y-auto pr-1"></div>
+        <div class="min-w-0">
+          <div class="label py-1"><span class="label-text text-xs opacity-70">Tasks</span></div>
+          <div id="tasks" class="flex flex-col gap-0.5 max-h-40 overflow-y-auto pr-1"></div>
         </div>
-        <div class="flex items-end gap-3">
-          <label class="form-control w-28">
-            <div class="label pb-1"><span class="label-text opacity-70">Episodes</span></div>
+        <div class="flex items-end gap-2 md:col-span-2 lg:col-span-1">
+          <label class="form-control w-24">
+            <div class="label py-1"><span class="label-text text-xs opacity-70">Episodes</span></div>
             <input type="number" id="episodes" value="3" min="1" max="10" class="input input-bordered input-sm w-full">
           </label>
           <button id="launch" class="btn btn-primary btn-sm flex-1">Launch run</button>
@@ -71,9 +71,9 @@
   </div>
 
   <!-- right: results + detail -->
-  <div class="flex flex-col gap-4 lg:gap-6 min-w-0">
+  <div class="flex flex-col gap-3 lg:gap-4 min-w-0">
     <div class="card bg-base-200 shadow-sm">
-      <div class="card-body gap-3">
+      <div class="card-body p-4 gap-3">
         <div class="flex items-baseline justify-between flex-wrap gap-2">
           <h2 class="card-title text-base">Results</h2>
           <span class="text-xs opacity-60">mean score as % of task max · click a cell for judge checklists &amp; diffs · live</span>
@@ -183,7 +183,7 @@ async function refreshResults() {
   models.sort((a, b) => avg(b) - avg(a));
 
   let html = "<tr><th class='task'>task</th>" + models.map(m =>
-    `<th>${esc(m.replace("openrouter/", ""))}</th>`).join("") + "</tr>";
+    `<th title="${esc(m)}">${esc(m.split("/").pop())}</th>`).join("") + "</tr>";
   html += tasks.map(t => "<tr><td class='task'>" + esc(t) + "</td>" + models.map(m => {
     const p = pct(m, t), rs = cell(m, t);
     if (p == null) return "<td>–</td>";
