@@ -112,9 +112,49 @@ interface Run {
   shards: Shard[];
 }
 
-const runs = new Map<string, Run>();
+interface RunRecord extends Run {
+  finishedAt?: string;
+}
+
+const HISTORY_FILE = join(RESULTS_DIR, "run-history.json");
+const runs = new Map<string, RunRecord>();
 const procs = new Map<string, ReturnType<typeof Bun.spawn>>();
 let runSeq = 0;
+
+// Restore prior runs so history survives server restarts. Shards that were
+// live when the previous process died are marked stopped.
+try {
+  const stored: RunRecord[] = JSON.parse(await readFile(HISTORY_FILE, "utf-8"));
+  for (const run of stored) {
+    for (const shard of run.shards) {
+      if (shard.status === "running" || shard.status === "pending")
+        shard.status = "stopped";
+    }
+    if (!run.finishedAt) run.finishedAt = run.startedAt;
+    runs.set(run.id, run);
+  }
+  runSeq = stored.length;
+} catch {
+  // no history yet
+}
+
+let persistTimer: ReturnType<typeof setTimeout> | undefined;
+function persistHistory() {
+  // Debounced: shard exits and staggered launches can fire close together.
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    Bun.write(HISTORY_FILE, JSON.stringify([...runs.values()], null, 2)).catch(
+      (e) => console.error("failed to persist run history:", e),
+    );
+  }, 250);
+}
+
+function maybeFinish(run: RunRecord) {
+  const live = run.shards.some(
+    (s) => s.status === "running" || s.status === "pending",
+  );
+  if (!live && !run.finishedAt) run.finishedAt = new Date().toISOString();
+}
 
 function fileSuffix(model: string) {
   return model.replace(/[^a-zA-Z0-9.]+/g, "-");
@@ -122,7 +162,7 @@ function fileSuffix(model: string) {
 
 function launchRun(models: string[], tasks: string[], episodes: number): Run {
   const id = `run${++runSeq}-${Date.now().toString(36)}`;
-  const run: Run = {
+  const run: RunRecord = {
     id,
     models,
     tasks,
@@ -137,6 +177,7 @@ function launchRun(models: string[], tasks: string[], episodes: number): Run {
     })),
   };
   runs.set(id, run);
+  persistHistory();
 
   (async () => {
     for (const shard of run.shards) {
@@ -174,7 +215,10 @@ function launchRun(models: string[], tasks: string[], episodes: number): Run {
         if (shard.status === "running")
           shard.status = code === 0 ? "done" : "failed";
         procs.delete(`${id}::${shard.model}`);
+        maybeFinish(run);
+        persistHistory();
       });
+      persistHistory();
       if (shard !== run.shards[run.shards.length - 1])
         await new Promise((r) => setTimeout(r, SHARD_STAGGER_MS));
     }
@@ -183,7 +227,7 @@ function launchRun(models: string[], tasks: string[], episodes: number): Run {
   return run;
 }
 
-function stopRun(run: Run) {
+function stopRun(run: RunRecord) {
   run.stopped = true;
   for (const shard of run.shards) {
     const proc = procs.get(`${run.id}::${shard.model}`);
@@ -194,6 +238,8 @@ function stopRun(run: Run) {
       shard.status = "stopped";
     }
   }
+  maybeFinish(run);
+  persistHistory();
 }
 
 async function runProgress(run: Run) {
@@ -259,6 +305,13 @@ const server = Bun.serve({
       if (path === "/" || path === "/index.html") {
         return new Response(
           await readFile(join(PUBLIC_DIR, "index.html")),
+          { headers: { "content-type": "text/html; charset=utf-8" } },
+        );
+      }
+
+      if (path === "/runs") {
+        return new Response(
+          await readFile(join(PUBLIC_DIR, "runs.html")),
           { headers: { "content-type": "text/html; charset=utf-8" } },
         );
       }

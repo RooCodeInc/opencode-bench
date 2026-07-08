@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en" data-theme="dim">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>opencode-bench · run history</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-base-100 min-h-screen">
+
+<div class="navbar bg-base-200 border-b border-base-300 px-4 lg:px-6 sticky top-0 z-20 gap-3">
+  <div class="flex-1 flex items-baseline gap-3 min-w-0">
+    <a href="/" class="text-lg font-bold whitespace-nowrap link no-underline">opencode-bench</a>
+    <span class="text-sm opacity-60">run history</span>
+  </div>
+  <a href="/" class="btn btn-ghost btn-sm">Results</a>
+</div>
+
+<main class="p-3 lg:p-5">
+  <div class="card bg-base-200 shadow-sm">
+    <div class="card-body p-3 lg:p-5 gap-3">
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>run</th><th>started</th><th>duration</th><th>scope</th>
+              <th>shards</th><th>state</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="text-xs opacity-50" id="empty" style="display:none">
+        No runs yet — launch one from the Results page.
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const STATUS_BADGE = {
+  running: "badge-info", pending: "badge-ghost", done: "badge-success",
+  failed: "badge-error", stopped: "badge-warning",
+};
+
+function fmtDuration(start, end) {
+  if (!end) return "running";
+  const s = Math.round((new Date(end) - new Date(start)) / 1000);
+  if (s < 90) return s + "s";
+  const m = Math.round(s / 60);
+  return m < 90 ? m + "m" : (m / 60).toFixed(1) + "h";
+}
+
+async function refresh() {
+  const runs = await (await fetch("/api/runs")).json();
+  document.getElementById("empty").style.display = runs.length ? "none" : "";
+  document.getElementById("rows").innerHTML = runs.map(run => {
+    const active = run.shards.some(s => s.status === "running" || s.status === "pending");
+    const state = active ? "running"
+      : run.shards.every(s => s.status === "done") ? "done"
+      : run.shards.some(s => s.status === "failed") ? "failed" : "stopped";
+    const shards = run.shards.map(s =>
+      `<div class="flex items-center gap-1.5 text-xs whitespace-nowrap">
+        <span class="badge badge-xs ${STATUS_BADGE[s.status] ?? "badge-ghost"}"></span>
+        <span class="font-mono">${esc(s.model.split("/").pop())}</span>
+        <span class="opacity-50 tabular-nums">${s.done}/${s.total}</span>
+      </div>`).join("");
+    return `<tr>
+      <td class="font-semibold whitespace-nowrap">${esc(run.id)}</td>
+      <td class="whitespace-nowrap text-xs opacity-70">${new Date(run.startedAt).toLocaleString()}</td>
+      <td class="text-xs tabular-nums">${fmtDuration(run.startedAt, run.finishedAt)}</td>
+      <td class="text-xs opacity-70 whitespace-nowrap">${run.tasks.length} tasks × ${run.episodes} ep</td>
+      <td><div class="flex flex-col gap-0.5">${shards}</div></td>
+      <td><span class="badge badge-sm ${STATUS_BADGE[state]}">${state}</span></td>
+    </tr>`;
+  }).join("");
+}
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>
