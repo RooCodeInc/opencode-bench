@@ -12,7 +12,7 @@ import { Logger } from "./util/logger.js";
  *
  * This complements the repo-task evals, where checklists are derived from a
  * reference diff: here the checklist IS the eval definition, so behavior
- * evals (e.g. "how Roomote uses Slack") state intent directly and let
+ * evals (e.g. chat-integration behavior) state intent directly and let
  * implementations vary.
  */
 export namespace Criteria {
@@ -23,7 +23,7 @@ export namespace Criteria {
     name: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
     /** What is being evaluated (model, prompt version, branch) — becomes the model axis. */
     target: z.string().min(1),
-    agent: z.string().default("roomote"),
+    agent: z.string().default("external"),
     episode: z.number().int().positive().default(1),
     /** Authored success criteria: concrete, independently checkable facts. */
     criteria: z.array(z.string().min(1)).min(1).max(25),

@@ -3,11 +3,11 @@
  * Judge criterion-based eval bundles and append the results to a results
  * file the dashboard/UI already understands.
  *
- * A bundle is produced by an external scenario runner (e.g. Roomote's
- * mock-Slack rig) and looks like:
+ * A bundle is produced by an external scenario runner (e.g. a
+ * chat-integration test harness) and looks like:
  *   {
  *     "name": "slack-thread-mention-creates-issue",
- *     "target": "roomote@develop",
+ *     "target": "myagent@develop",
  *     "episode": 1,
  *     "criteria": ["Exactly one acknowledgment is posted in the thread", ...],
  *     "artifacts": { "slack_transcript": "...", "task_diff": "..." },
