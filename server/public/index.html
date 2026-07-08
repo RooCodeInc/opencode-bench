@@ -1,141 +1,98 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dim">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>opencode-bench</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <style>
-  :root {
-    --bg: #0f1117; --panel: #171a23; --border: #262b38; --text: #e2e6ef;
-    --muted: #8b93a7; --accent: #6ea8fe; --good: #2fbf71; --mid: #e2b93b; --bad: #e05252;
-    font-size: 15px;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-    font: 1rem/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .wrap { max-width: 1240px; margin: 0 auto; padding: 1.5rem 1.5rem 4rem; }
-  h1 { font-size: 1.3rem; margin: 0; }
-  h2 { font-size: 1rem; margin: 0 0 .6rem; color: var(--muted); text-transform: uppercase;
-    letter-spacing: .06em; font-weight: 600; }
-  .topbar { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
-  .topbar .spend { margin-left: auto; color: var(--muted); font-size: .85rem;
-    font-variant-numeric: tabular-nums; }
-  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
-    padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
-  .launcher { display: grid; grid-template-columns: 1fr 1fr auto; gap: 1.25rem; }
-  @media (max-width: 900px) { .launcher { grid-template-columns: 1fr; } }
-  .field label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: .35rem; }
-  textarea, input[type=number] { width: 100%; background: #10131b; color: var(--text);
-    border: 1px solid var(--border); border-radius: 6px; padding: .5rem .6rem;
-    font: .85rem/1.4 ui-monospace, monospace; }
-  textarea { resize: vertical; min-height: 7.5rem; }
-  .tasklist { display: flex; flex-direction: column; gap: .25rem; max-height: 12rem;
-    overflow-y: auto; font-size: .85rem; }
-  .tasklist label { display: flex; gap: .5rem; align-items: center; color: var(--text); }
-  .tasklist .repo { color: var(--muted); font-size: .75rem; }
-  .launch-col { display: flex; flex-direction: column; gap: .75rem; justify-content: flex-end; }
-  button { background: var(--accent); color: #0b0d12; font-weight: 600; border: 0;
-    border-radius: 6px; padding: .55rem 1.1rem; cursor: pointer; font-size: .9rem; }
-  button.secondary { background: transparent; color: var(--bad); border: 1px solid var(--bad);
-    padding: .15rem .6rem; font-size: .75rem; }
-  button:disabled { opacity: .5; cursor: default; }
-  .runrow { display: flex; gap: 1rem; align-items: center; font-size: .85rem;
-    padding: .35rem 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
-  .runrow:first-of-type { border-top: 0; }
-  .runrow .model { min-width: 16rem; }
-  .bar { flex: 1 1 8rem; height: 8px; background: #10131b; border-radius: 4px; overflow: hidden; }
-  .bar i { display: block; height: 100%; background: var(--accent); }
-  .status { font-size: .75rem; color: var(--muted); min-width: 4.5rem; }
-  .status.done { color: var(--good); }
-  .status.failed, .status.stopped { color: var(--bad); }
-  .logtail { flex-basis: 100%; color: var(--muted); font: .7rem/1.3 ui-monospace, monospace;
-    white-space: pre-wrap; overflow-wrap: anywhere; }
+  /* Heatmap matrix — custom on purpose: score-colored cells + sticky task column */
   .matrix-scroll { overflow-x: auto; }
   table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; }
-  .matrix th, .matrix td { border: 1px solid var(--border); border-width: 0 1px 1px 0;
-    padding: .4rem .55rem; text-align: center; min-width: 6.5rem; }
+  .matrix th, .matrix td { border: 1px solid color-mix(in oklab, currentColor 12%, transparent);
+    border-width: 0 1px 1px 0; padding: .45rem .6rem; text-align: center;
+    min-width: 6.5rem; font-variant-numeric: tabular-nums; }
   .matrix tr:first-child th { border-top-width: 1px; }
   .matrix th.task, .matrix td.task { border-left-width: 1px; }
-  .matrix th { background: var(--panel); font-weight: 600; font-size: .8rem; }
+  .matrix th { font-weight: 600; font-size: .78rem; }
   .matrix th.task, .matrix td.task { text-align: left; position: sticky; left: 0;
-    background: var(--panel); z-index: 1; min-width: 11rem; max-width: 14rem; }
-  .matrix td.task { color: var(--muted); font-size: .82rem; }
-  .cell { cursor: pointer; font-variant-numeric: tabular-nums; }
-  .cell:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .cell .eps { display: block; color: var(--muted); font-size: .68rem; }
-  .detail h3 { font-size: 1rem; margin: 0 0 .5rem; }
-  .ep { border-top: 1px solid var(--border); padding: .7rem 0; }
-  .ep-head { display: flex; gap: 1.25rem; flex-wrap: wrap; font-size: .85rem; color: var(--muted); }
-  .ep-head b { color: var(--text); }
-  .crit { margin: .55rem 0 0 .5rem; }
-  .crit-row { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; font-size: .85rem; }
-  .crit-name { min-width: 10.5rem; }
-  .judge { border: 1px solid var(--border); border-radius: 999px; padding: 0 .55rem;
-    font-size: .75rem; cursor: pointer; background: transparent; color: var(--text); }
-  .judge.pass { border-color: var(--good); color: var(--good); }
-  .judge.fail { border-color: var(--bad); color: var(--bad); }
-  .rationale { background: #10131b; border-left: 3px solid var(--accent); margin: .4rem 0 .4rem .5rem;
-    padding: .5rem .75rem; font-size: .82rem; color: var(--muted); white-space: pre-wrap; }
-  details.diffs { margin-top: .6rem; }
-  details.diffs summary { cursor: pointer; color: var(--accent); font-size: .85rem; }
-  .diff-cols { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .5rem; }
-  @media (max-width: 900px) { .diff-cols { grid-template-columns: 1fr; } }
-  .diff-col h4 { font-size: .78rem; margin: 0 0 .3rem; color: var(--muted); }
-  pre.diff { background: #10131b; border: 1px solid var(--border); border-radius: 6px;
-    padding: .6rem; overflow-x: auto; font-size: .72rem; max-height: 420px; margin: 0; }
-  .legend { color: var(--muted); font-size: .78rem; margin: .5rem 0 1rem; }
+    z-index: 1; min-width: 11rem; max-width: 14rem; font-size: .8rem;
+    background: var(--color-base-200); }
+  .cell { cursor: pointer; }
+  .cell:hover { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+  .cell .eps { display: block; opacity: .65; font-size: .68rem; }
+  pre.diff { max-height: 420px; overflow: auto; font-size: .72rem; padding: .6rem;
+    border-radius: .5rem; background: var(--color-base-300); margin: 0; }
 </style>
 </head>
-<body>
-<div class="wrap">
-  <div class="topbar">
-    <h1>opencode-bench</h1>
-    <span style="color:var(--muted);font-size:.85rem">agents vs production commits, judged by model panel</span>
-    <span class="spend" id="spend"></span>
-  </div>
+<body class="bg-base-100 min-h-screen">
 
-  <div class="panel">
-    <h2>New run</h2>
-    <div class="launcher">
-      <div class="field">
-        <label>Models (one per line, provider/model)</label>
-        <textarea id="models"></textarea>
-      </div>
-      <div class="field">
-        <label>Tasks</label>
-        <div class="tasklist" id="tasks"></div>
-      </div>
-      <div class="launch-col">
-        <div class="field">
-          <label>Episodes per cell</label>
-          <input type="number" id="episodes" value="3" min="1" max="10">
+<div class="navbar bg-base-200 border-b border-base-300 px-4 lg:px-6 sticky top-0 z-20">
+  <div class="flex-1 flex items-baseline gap-3">
+    <span class="text-lg font-bold">opencode-bench</span>
+    <span class="text-sm opacity-60 hidden sm:inline">agents vs production commits, judged by a model panel</span>
+  </div>
+  <div class="flex-none text-sm opacity-70 tabular-nums" id="spend"></div>
+</div>
+
+<main class="p-4 lg:p-6 grid gap-4 lg:gap-6 lg:grid-cols-[400px_minmax(0,1fr)] max-w-[1700px] mx-auto">
+
+  <!-- left: launcher + runs -->
+  <div class="flex flex-col gap-4 lg:gap-6">
+    <div class="card bg-base-200 shadow-sm">
+      <div class="card-body gap-4">
+        <h2 class="card-title text-base">New run</h2>
+        <label class="form-control w-full">
+          <div class="label pb-1"><span class="label-text opacity-70">Models — one per line, provider/model</span></div>
+          <textarea id="models" rows="5" class="textarea textarea-bordered font-mono text-xs leading-5 w-full"></textarea>
+        </label>
+        <div>
+          <div class="label pb-1"><span class="label-text opacity-70">Tasks</span></div>
+          <div id="tasks" class="flex flex-col gap-1 max-h-56 overflow-y-auto pr-1"></div>
         </div>
-        <button id="launch">Launch run</button>
+        <div class="flex items-end gap-3">
+          <label class="form-control w-28">
+            <div class="label pb-1"><span class="label-text opacity-70">Episodes</span></div>
+            <input type="number" id="episodes" value="3" min="1" max="10" class="input input-bordered input-sm w-full">
+          </label>
+          <button id="launch" class="btn btn-primary btn-sm flex-1">Launch run</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-200 shadow-sm" id="runs-panel" style="display:none">
+      <div class="card-body gap-3">
+        <h2 class="card-title text-base">Runs</h2>
+        <div id="runs" class="flex flex-col gap-4"></div>
       </div>
     </div>
   </div>
 
-  <div class="panel" id="runs-panel" style="display:none">
-    <h2>Runs</h2>
-    <div id="runs"></div>
-  </div>
+  <!-- right: results + detail -->
+  <div class="flex flex-col gap-4 lg:gap-6 min-w-0">
+    <div class="card bg-base-200 shadow-sm">
+      <div class="card-body gap-3">
+        <div class="flex items-baseline justify-between flex-wrap gap-2">
+          <h2 class="card-title text-base">Results</h2>
+          <span class="text-xs opacity-60">mean score as % of task max · click a cell for judge checklists &amp; diffs · live</span>
+        </div>
+        <div class="matrix-scroll"><table class="matrix" id="matrix"></table></div>
+      </div>
+    </div>
 
-  <div class="panel">
-    <h2>Results</h2>
-    <div class="legend">Cells show mean score as % of the task's max, across all stored episodes.
-      Click a cell for per-episode judge checklists and the agent-vs-production diff.
-      Auto-refreshes every 10s.</div>
-    <div class="matrix-scroll"><table class="matrix" id="matrix"></table></div>
+    <div class="card bg-base-200 shadow-sm" id="detail-card" style="display:none">
+      <div class="card-body gap-2" id="detail"></div>
+    </div>
   </div>
-
-  <div class="panel detail" id="detail" style="display:none"></div>
-</div>
+</main>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
-let TASKS = [], RESULTS = [], SELECTED = null;
+let TASKS = [], RESULTS = [];
 
 async function api(path, opts) {
   const res = await fetch(path, opts);
@@ -147,8 +104,11 @@ async function api(path, opts) {
 async function initLauncher() {
   TASKS = await api("/api/tasks");
   $("tasks").innerHTML = TASKS.map(t =>
-    `<label><input type="checkbox" value="${t.name}" checked>
-     <span>${t.name}</span> <span class="repo">${t.repo}</span></label>`).join("");
+    `<label class="label cursor-pointer justify-start gap-2 py-0.5">
+       <input type="checkbox" value="${t.name}" checked class="checkbox checkbox-xs checkbox-primary">
+       <span class="label-text text-xs">${t.name}</span>
+       <span class="text-[.65rem] opacity-50">${t.repo}</span>
+     </label>`).join("");
   const models = await api("/api/models");
   $("models").value = models.join("\n");
 }
@@ -168,26 +128,33 @@ $("launch").onclick = async () => {
 };
 
 // ---- runs ----
+const STATUS_BADGE = {
+  running: "badge-info", pending: "badge-ghost", done: "badge-success",
+  failed: "badge-error", stopped: "badge-warning",
+};
+
 async function refreshRuns() {
   const runs = await api("/api/runs");
   $("runs-panel").style.display = runs.length ? "" : "none";
   $("runs").innerHTML = runs.map(run => {
     const active = run.shards.some(s => s.status === "running" || s.status === "pending");
-    const head = `<div class="runrow"><b>${run.id}</b>
-      <span style="color:var(--muted)">${run.tasks.length} tasks × ${run.episodes} ep · started ${new Date(run.startedAt).toLocaleTimeString()}</span>
-      ${active ? `<button class="secondary" onclick="stopRun('${run.id}')">stop</button>` : ""}</div>`;
-    const rows = run.shards.map(s => {
+    const shards = run.shards.map(s => {
       const pct = s.total ? Math.round(100 * s.done / s.total) : 0;
-      return `<div class="runrow">
-        <span class="model">${esc(s.model)}</span>
-        <div class="bar"><i style="width:${pct}%"></i></div>
-        <span style="font-variant-numeric:tabular-nums">${s.done}/${s.total}</span>
-        <span class="status ${s.status}">${s.status}</span>
-        ${s.status === "running" && s.logTail ? `<span class="logtail">${esc(s.logTail)}</span>` : ""}
-      </div>`;
+      return `<div class="flex items-center gap-2 text-xs">
+        <span class="w-44 truncate font-mono" title="${esc(s.model)}">${esc(s.model.replace("openrouter/",""))}</span>
+        <progress class="progress progress-primary flex-1" value="${s.done}" max="${s.total}"></progress>
+        <span class="tabular-nums w-10 text-right">${s.done}/${s.total}</span>
+        <span class="badge badge-xs ${STATUS_BADGE[s.status] ?? "badge-ghost"}">${s.status}</span>
+      </div>
+      ${s.status === "running" && s.logTail ? `<div class="text-[.65rem] opacity-50 font-mono pl-1 truncate">${esc(s.logTail.split("\n").pop())}</div>` : ""}`;
     }).join("");
-    return head + rows;
-  }).join("<hr style='border:0;border-top:1px solid var(--border)'>");
+    return `<div class="flex flex-col gap-1.5">
+      <div class="flex items-center gap-2 text-sm">
+        <span class="font-semibold">${run.id}</span>
+        <span class="opacity-60 text-xs">${run.tasks.length} tasks × ${run.episodes} ep · ${new Date(run.startedAt).toLocaleTimeString()}</span>
+        ${active ? `<button class="btn btn-outline btn-error btn-xs ml-auto" onclick="stopRun('${run.id}')">stop</button>` : ""}
+      </div>${shards}</div>`;
+  }).join("<div class='divider my-0'></div>");
 }
 
 window.stopRun = async (id) => { await api(`/api/runs/${id}/stop`, {method:"POST"}); refreshRuns(); };
@@ -209,7 +176,6 @@ async function refreshResults() {
     return rs.reduce((s, r) => s + r.score.final, 0) / rs.length / taskMax(t);
   };
   const color = (p) => p == null ? "transparent" : `hsl(${Math.round(p*120)} 55% 22%)`;
-  // order models by average desc
   const avg = (m) => {
     const ps = tasks.map(t => pct(m, t)).filter(p => p != null);
     return ps.length ? ps.reduce((a,b) => a+b, 0) / ps.length : 0;
@@ -226,7 +192,7 @@ async function refreshResults() {
       onclick="showDetail('${esc(m)}','${esc(t)}')">${(p*100).toFixed(0)}%
       <span class="eps">${rs.length} ep · $${cost.toFixed(2)}</span></td>`;
   }).join("") + "</tr>").join("");
-  html += "<tr><td class='task'><b>model average</b></td>" + models.map(m =>
+  html += "<tr><td class='task font-semibold'>model average</td>" + models.map(m =>
     `<td style="background:${color(avg(m))}"><b>${(avg(m)*100).toFixed(0)}%</b></td>`).join("") + "</tr>";
   $("matrix").innerHTML = html;
 }
@@ -236,42 +202,47 @@ window.showDetail = async (model, task) => {
   const rows = await api(`/api/cell?model=${encodeURIComponent(model)}&task=${encodeURIComponent(task)}`);
   let refDiff = "";
   try { refDiff = await (await fetch(`/api/reference-diff/${task}`)).text(); } catch {}
+  $("detail-card").style.display = "";
   const el = $("detail");
-  el.style.display = "";
-  el.innerHTML = `<h3>${esc(task)} · ${esc(model)}</h3>` + rows.map((r, i) => {
+  el.innerHTML = `<h2 class="card-title text-base">${esc(task)} <span class="opacity-60 font-normal">· ${esc(model)}</span></h2>` +
+  rows.map((r, i) => {
     const crits = r.scoreDetails.map((s, si) => {
       const judges = s.judges.map((j, ji) =>
-        `<button class="judge ${j.score >= 0.5 ? "pass" : "fail"}"
+        `<button class="badge badge-outline ${j.score >= 0.5 ? "badge-success" : "badge-error"} cursor-pointer"
           onclick="toggleRat(${i},${si},${ji})">${esc(j.judge.split("/").pop())} ${j.score.toFixed(2)}</button>`
       ).join(" ");
       const rats = s.judges.map((j, ji) => {
         const items = (j.checklist || []).map(c =>
           `<div>${c.satisfied ? "✓" : "✗"} ${esc(c.item)}</div>`).join("");
-        return `<div class="rationale" id="rat-${i}-${si}-${ji}" style="display:none">
+        return `<div id="rat-${i}-${si}-${ji}" style="display:none"
+          class="text-xs opacity-80 border-l-2 border-primary pl-3 py-2 my-1 ml-2 whitespace-pre-wrap bg-base-300 rounded-r">
           <b>${esc(j.judge)}:</b> ${esc(j.rationale || "(no rationale)")}
-          ${items ? `<div style="margin-top:.4rem">${items}</div>` : ""}</div>`;
+          ${items ? `<div class="mt-2 opacity-90">${items}</div>` : ""}</div>`;
       }).join("");
-      return `<div class="crit"><div class="crit-row">
-        <span class="crit-name">${esc(s.criterion)} (w ${s.weight})</span>${judges}
-        ${s.variance > 0.02 ? `<span style="color:var(--mid)">disagreement</span>` : ""}
+      return `<div class="mt-2 ml-1">
+        <div class="flex flex-wrap items-baseline gap-2 text-sm">
+          <span class="w-44 text-xs opacity-70">${esc(s.criterion)} (w ${s.weight})</span>${judges}
+          ${s.variance > 0.02 ? `<span class="badge badge-warning badge-outline badge-sm">disagreement</span>` : ""}
         </div>${rats}</div>`;
     }).join("");
-    const diffs = `<details class="diffs"><summary>agent diff vs production diff</summary>
-      <div class="diff-cols">
-        <div class="diff-col"><h4>agent (${r.diffChars ?? (r.diff||"").length} chars)</h4>
+    const diffs = `<details class="mt-3">
+      <summary class="cursor-pointer text-sm link link-primary no-underline">agent diff vs production diff</summary>
+      <div class="grid md:grid-cols-2 gap-3 mt-2">
+        <div><div class="text-xs opacity-60 mb-1">agent</div>
           <pre class="diff">${esc(r.diff || "(empty submission)")}</pre></div>
-        <div class="diff-col"><h4>production (reference)</h4>
+        <div><div class="text-xs opacity-60 mb-1">production (reference)</div>
           <pre class="diff">${esc(refDiff || "(unavailable)")}</pre></div>
       </div></details>`;
-    return `<div class="ep"><div class="ep-head">
-      <span>episode <b>${r.episode ?? 1}</b></span>
-      <span>score <b>${r.score.final.toFixed(3)}</b> / ${taskMax(task).toFixed(1)}
-        (base ${r.score.base.toFixed(3)} − penalty ${r.score.penalty.toFixed(3)})</span>
-      <span>cost <b>$${(r.usage?.cost ?? 0).toFixed(2)}</b></span>
-      <span>duration <b>${Math.round((r.duration ?? 0)/1000)}s</b></span>
+    return `<div class="border-t border-base-300 pt-3 mt-2">
+      <div class="flex flex-wrap gap-x-5 gap-y-1 text-sm opacity-80">
+        <span>episode <b>${r.episode ?? 1}</b></span>
+        <span>score <b>${r.score.final.toFixed(3)}</b> / ${taskMax(task).toFixed(1)}
+          <span class="opacity-60">(base ${r.score.base.toFixed(3)} − penalty ${r.score.penalty.toFixed(3)})</span></span>
+        <span>cost <b>$${(r.usage?.cost ?? 0).toFixed(2)}</b></span>
+        <span>duration <b>${Math.round((r.duration ?? 0)/1000)}s</b></span>
       </div>${crits}${diffs}</div>`;
   }).join("");
-  el.scrollIntoView({ behavior: "smooth" });
+  $("detail-card").scrollIntoView({ behavior: "smooth" });
 };
 
 window.toggleRat = (i, si, ji) => {
