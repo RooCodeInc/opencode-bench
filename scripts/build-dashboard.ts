@@ -58,11 +58,16 @@ const html = `<!doctype html>
   .wrap { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
   h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
   .sub { color: var(--muted); margin-bottom: 1.5rem; font-size: .9rem; }
-  table.matrix { border-collapse: collapse; width: 100%; margin-bottom: 2rem; }
-  .matrix th, .matrix td { border: 1px solid var(--border); padding: .5rem .75rem; text-align: center; }
+  .matrix-scroll { overflow-x: auto; margin-bottom: 2rem; }
+  table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; }
+  .matrix th, .matrix td { border: 1px solid var(--border); border-width: 0 1px 1px 0;
+    padding: .45rem .6rem; text-align: center; min-width: 6.5rem; }
+  .matrix tr:first-child th { border-top-width: 1px; }
+  .matrix th.task, .matrix td.task { border-left-width: 1px; }
   .matrix th { background: var(--panel); font-weight: 600; font-size: .85rem; }
-  .matrix th.task { text-align: left; }
-  .matrix td.task { text-align: left; color: var(--muted); font-size: .85rem; }
+  .matrix th.task, .matrix td.task { text-align: left; position: sticky; left: 0;
+    background: var(--panel); z-index: 1; min-width: 11rem; max-width: 14rem; }
+  .matrix td.task { color: var(--muted); font-size: .85rem; }
   .cell { cursor: pointer; font-variant-numeric: tabular-nums; }
   .cell:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
   .cell .eps { display: block; color: var(--muted); font-size: .7rem; }
@@ -98,7 +103,7 @@ const html = `<!doctype html>
   <div class="legend">Cells show mean score as % of the task's max possible
     (weights are not normalized upstream). Click a cell for the per-episode judge
     breakdown and the agent's diff vs the shipped production diff.</div>
-  <table class="matrix" id="matrix"></table>
+  <div class="matrix-scroll"><table class="matrix" id="matrix"></table></div>
   <div id="detail"></div>
 </div>
 <script>

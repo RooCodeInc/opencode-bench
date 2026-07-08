@@ -50,10 +50,15 @@
   .status.failed, .status.stopped { color: var(--bad); }
   .logtail { flex-basis: 100%; color: var(--muted); font: .7rem/1.3 ui-monospace, monospace;
     white-space: pre-wrap; overflow-wrap: anywhere; }
-  table.matrix { border-collapse: collapse; width: 100%; }
-  .matrix th, .matrix td { border: 1px solid var(--border); padding: .45rem .6rem; text-align: center; }
+  .matrix-scroll { overflow-x: auto; }
+  table.matrix { border-collapse: separate; border-spacing: 0; width: 100%; }
+  .matrix th, .matrix td { border: 1px solid var(--border); border-width: 0 1px 1px 0;
+    padding: .4rem .55rem; text-align: center; min-width: 6.5rem; }
+  .matrix tr:first-child th { border-top-width: 1px; }
+  .matrix th.task, .matrix td.task { border-left-width: 1px; }
   .matrix th { background: var(--panel); font-weight: 600; font-size: .8rem; }
-  .matrix th.task, .matrix td.task { text-align: left; }
+  .matrix th.task, .matrix td.task { text-align: left; position: sticky; left: 0;
+    background: var(--panel); z-index: 1; min-width: 11rem; max-width: 14rem; }
   .matrix td.task { color: var(--muted); font-size: .82rem; }
   .cell { cursor: pointer; font-variant-numeric: tabular-nums; }
   .cell:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -120,7 +125,7 @@
     <div class="legend">Cells show mean score as % of the task's max, across all stored episodes.
       Click a cell for per-episode judge checklists and the agent-vs-production diff.
       Auto-refreshes every 10s.</div>
-    <table class="matrix" id="matrix"></table>
+    <div class="matrix-scroll"><table class="matrix" id="matrix"></table></div>
   </div>
 
   <div class="panel detail" id="detail" style="display:none"></div>
