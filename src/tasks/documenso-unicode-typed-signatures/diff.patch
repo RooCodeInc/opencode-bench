@@ -1,0 +1,135 @@
+diff --git a/packages/lib/constants/pdf.test.ts b/packages/lib/constants/pdf.test.ts
+new file mode 100644
+index 0000000000..dc9f5e7d7b
+--- /dev/null
++++ b/packages/lib/constants/pdf.test.ts
+@@ -0,0 +1,44 @@
++import { describe, expect, it } from 'vitest';
++
++import { getSignatureFontFamily } from './pdf';
++
++describe('getSignatureFontFamily', () => {
++  const expectCaveat = (family: string) => expect(family).toBe('Caveat');
++  const expectNotoChain = (family: string) => {
++    expect(family).toContain('"Noto Sans"');
++    expect(family).toContain('"Noto Sans Chinese"');
++    expect(family).toContain('"Noto Sans Japanese"');
++    expect(family).toContain('"Noto Sans Korean"');
++    expect(family).toContain('sans-serif');
++    expect(family).not.toContain('Caveat');
++  };
++
++  it('returns Caveat for ASCII-only text', () => {
++    expectCaveat(getSignatureFontFamily('John Doe'));
++    expectCaveat(getSignatureFontFamily(''));
++  });
++
++  it('returns the Noto chain for any non-ASCII character', () => {
++    expectNotoChain(getSignatureFontFamily('François'));
++    expectNotoChain(getSignatureFontFamily('Müller'));
++    expectNotoChain(getSignatureFontFamily('Søren'));
++    expectNotoChain(getSignatureFontFamily('Иванов'));
++    expectNotoChain(getSignatureFontFamily('Ελληνικά'));
++    expectNotoChain(getSignatureFontFamily('عربي'));
++    expectNotoChain(getSignatureFontFamily('עברית'));
++    expectNotoChain(getSignatureFontFamily('도큐멘소'));
++    expectNotoChain(getSignatureFontFamily('中文签名'));
++    expectNotoChain(getSignatureFontFamily('こんにちは'));
++  });
++
++  it('returns the Noto chain for mixed ASCII + non-ASCII input', () => {
++    expectNotoChain(getSignatureFontFamily('Hello 안녕'));
++    expectNotoChain(getSignatureFontFamily('Ivan Ωmega'));
++  });
++
++  it('returns the Noto chain for scripts not covered by a dedicated Noto file', () => {
++    expectNotoChain(getSignatureFontFamily('ሰላም')); // Ethiopic
++    expectNotoChain(getSignatureFontFamily('សួស្ដី')); // Khmer
++    expectNotoChain(getSignatureFontFamily('ᠮᠣᠩᠭᠣᠯ')); // Mongolian
++  });
++});
+diff --git a/packages/lib/constants/pdf.ts b/packages/lib/constants/pdf.ts
+index 2d66948b8e..6aa56a69db 100644
+--- a/packages/lib/constants/pdf.ts
++++ b/packages/lib/constants/pdf.ts
+@@ -9,6 +9,20 @@ export const MIN_HANDWRITING_FONT_SIZE = 20;
+ 
+ export const CAVEAT_FONT_PATH = () => `${NEXT_PUBLIC_WEBAPP_URL()}/fonts/caveat.ttf`;
+ 
++const SIGNATURE_FONT_FAMILY_CAVEAT = 'Caveat';
++
++// CN-before-JP: the JP Noto file's Han glyphs use JP shapes, so pure-CN
++// text would otherwise render with JP forms. Family names sync with
++// apps/remix/app/app.css and packages/lib/server-only/pdf/helpers.ts.
++const SIGNATURE_FONT_FAMILY_NOTO =
++  '"Noto Sans", "Noto Sans Chinese", "Noto Sans Japanese", "Noto Sans Korean", sans-serif';
++
++const isASCII = (str: string) => /^\p{ASCII}*$/u.test(str);
++
++// Deliberately never mix handwriting + sans-serif within one signature.
++export const getSignatureFontFamily = (typedSignatureText: string): string =>
++  isASCII(typedSignatureText) ? SIGNATURE_FONT_FAMILY_CAVEAT : SIGNATURE_FONT_FAMILY_NOTO;
++
+ export const PDF_SIZE_A4_72PPI = {
+   width: 595,
+   height: 842,
+diff --git a/packages/lib/server-only/pdf/render-certificate.ts b/packages/lib/server-only/pdf/render-certificate.ts
+index 4d765e1279..a30d265ee4 100644
+--- a/packages/lib/server-only/pdf/render-certificate.ts
++++ b/packages/lib/server-only/pdf/render-certificate.ts
+@@ -14,6 +14,7 @@ import { renderSVG } from 'uqr';
+ 
+ import { NEXT_PUBLIC_WEBAPP_URL } from '../../constants/app';
+ import { APP_I18N_OPTIONS } from '../../constants/i18n';
++import { getSignatureFontFamily } from '../../constants/pdf';
+ import { RECIPIENT_ROLE_SIGNING_REASONS, RECIPIENT_ROLES_DESCRIPTION } from '../../constants/recipient-roles';
+ import type { TDocumentAuditLogBaseSchema } from '../../types/document-audit-logs';
+ import { svgToPng } from '../../utils/images/svg-to-png';
+@@ -302,7 +303,7 @@ const renderColumnTwo = (options: RenderColumnOptions) => {
+         x: 2,
+         text: recipient.signatureField?.signature?.typedSignature,
+         padding: 4,
+-        fontFamily: 'Caveat',
++        fontFamily: getSignatureFontFamily(recipient.signatureField?.signature?.typedSignature),
+         fontSize: 16,
+         align: 'center',
+         verticalAlign: 'middle',
+diff --git a/packages/lib/universal/field-renderer/render-signature-field.ts b/packages/lib/universal/field-renderer/render-signature-field.ts
+index fcfb4da877..a43d46115b 100644
+--- a/packages/lib/universal/field-renderer/render-signature-field.ts
++++ b/packages/lib/universal/field-renderer/render-signature-field.ts
+@@ -1,6 +1,6 @@
+ import Konva from 'konva';
+ 
+-import { DEFAULT_SIGNATURE_TEXT_FONT_SIZE } from '../../constants/pdf';
++import { DEFAULT_SIGNATURE_TEXT_FONT_SIZE, getSignatureFontFamily } from '../../constants/pdf';
+ import { AppError } from '../../errors/app-error';
+ import type { TSignatureFieldMeta } from '../../types/field-meta';
+ import { resolveFieldOverflowMode } from '../../types/field-meta';
+@@ -187,7 +187,7 @@ const createFieldSignature = (field: FieldToRender, options: RenderFieldElementO
+     isLabel,
+     textToRender,
+     fontSize,
+-    fontFamily: 'Caveat, sans-serif',
++    fontFamily: getSignatureFontFamily(textToRender),
+     lineHeight: 1,
+     letterSpacing: 0,
+     textAlign: 'center',
+@@ -209,7 +209,7 @@ const createFieldSignature = (field: FieldToRender, options: RenderFieldElementO
+     wrap: overflowLayout.wrap,
+     text: textToRender,
+     fontSize,
+-    fontFamily: 'Caveat, sans-serif',
++    fontFamily: getSignatureFontFamily(textToRender),
+     align: overflowLayout.textAlign,
+     width: overflowLayout.width,
+     height: overflowLayout.height,
+@@ -280,7 +280,7 @@ export const renderSignatureFieldElement = (field: FieldToRender, options: Rende
+         isLabel,
+         textToRender: fieldSignature.text(),
+         fontSize: fieldSignature.fontSize(),
+-        fontFamily: 'Caveat, sans-serif',
++        fontFamily: getSignatureFontFamily(fieldSignature.text()),
+         lineHeight: 1,
+         letterSpacing: 0,
+         textAlign: 'center',

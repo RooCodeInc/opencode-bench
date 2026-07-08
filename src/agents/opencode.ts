@@ -14,7 +14,7 @@ const opencodeConfig = {
     webfetch: "allow",
     external_directory: "allow",
   },
-  share: "auto",
+  share: "disabled",
   provider: {
     opencode: {
       options: {
@@ -48,6 +48,11 @@ export const models: string[] = [
   "opencode/kimi-k2",
   "opencode/grok-code",
   "opencode/alpha-gd4",
+  // Extra models (e.g. openrouter/openai/gpt-5.4) can be registered via env
+  // without editing this file: OPENCODE_BENCH_EXTRA_MODELS="a/b,c/d"
+  ...(process.env.OPENCODE_BENCH_EXTRA_MODELS?.split(",")
+    .map((m) => m.trim())
+    .filter(Boolean) ?? []),
 ];
 
 function sessionKey(model: string, cwd: string): string {
@@ -89,15 +94,32 @@ const opencodeAgent: Agent.Definition = {
     }
 
     options.logger.log(`Prompting session ${sessionID}...`);
-    const [providerID, modelID] = model.split("/");
+    // Model IDs may contain slashes in the model part (e.g. openrouter/openai/gpt-5.4),
+    // so only split on the first slash.
+    const slashIndex = model.indexOf("/");
+    const providerID = model.slice(0, slashIndex);
+    const modelID = model.slice(slashIndex + 1);
     const actions: string[] = [];
     const usage = {
       input: 0,
       output: 0,
       cost: 0,
     };
+    // Strong models can grind on a task for a very long time. Bound the agent
+    // phase and let the caller score whatever is on disk at the cutoff — a
+    // real time budget — instead of discarding the whole episode.
+    const agentTimeoutMs =
+      (Number.parseInt(
+        process.env.OPENCODE_BENCH_AGENT_TIMEOUT_MINS ?? "",
+        10,
+      ) || 15) *
+      60 *
+      1000;
+    const TIMED_OUT = Symbol("agent-timeout");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     try {
-      const { data, error } = await opencode.client.session.prompt({
+      const promptPromise = opencode.client.session.prompt({
         path: { id: sessionID! },
         query: { directory: options.cwd },
         body: {
@@ -109,6 +131,33 @@ const opencodeAgent: Agent.Definition = {
         },
       });
 
+      const raced = await Promise.race([
+        promptPromise,
+        new Promise<typeof TIMED_OUT>((resolve) => {
+          timer = setTimeout(() => resolve(TIMED_OUT), agentTimeoutMs);
+        }),
+      ]);
+
+      if (raced === TIMED_OUT) {
+        options.logger.log(
+          `Agent hit the ${agentTimeoutMs / 60000}min budget; aborting session and scoring current work tree.`,
+        );
+        try {
+          await opencode.client.session.abort({
+            path: { id: sessionID! },
+            query: { directory: options.cwd },
+          });
+        } catch (e) {
+          options.logger.error("Failed to abort session:", e);
+        }
+        sessionCache.delete(cacheKey);
+        actions.push(
+          JSON.stringify({ aborted: "agent time budget reached" }),
+        );
+        return { actions, usage };
+      }
+
+      const { data, error } = raced;
       if (error) throw error;
       options.logger.debug(`Data: ${JSON.stringify(data)}`);
 
@@ -129,6 +178,8 @@ const opencodeAgent: Agent.Definition = {
       sessionCache.delete(cacheKey);
       options.logger.error("Error in opencode agent: ", error);
       throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
 
     return { actions, usage };

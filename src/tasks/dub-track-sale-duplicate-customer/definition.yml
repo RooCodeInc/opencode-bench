@@ -1,0 +1,18 @@
+source:
+  repo: dubinc/dub
+  from: c30ef3bff2f930c1c20f40ae629c88a7a31f9b04
+  to: be4867cb33cab442b34ae4a619b04f3de7c13398
+context: >
+  The sale-tracking endpoint intermittently fails with duplicate-customer
+  errors when the same external customer id is tracked concurrently. Describe
+  the symptom and ask for the endpoint to handle it gracefully; keep prompt
+  free of implementation specifics.
+metrics:
+  - name: api-signature
+    weight: 0.1
+  - name: logic-equivalence
+    weight: 0.4
+  - name: integration-points
+    weight: 0.3
+  - name: test-coverage
+    weight: 0.2

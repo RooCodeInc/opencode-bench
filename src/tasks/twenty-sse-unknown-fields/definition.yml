@@ -1,0 +1,18 @@
+source:
+  repo: twentyhq/twenty
+  from: 429e8c4b8463b604a72d0bd4b3a28eaaa8fe5fd4
+  to: d8ea406b805afdf39404e7f361bff535bedb42a3
+context: >
+  Server-sent events that include fields the client does not recognize cause
+  the whole optimistic cache update to be dropped. Ask for unknown fields to
+  be skipped so the rest of the event still applies; keep the prompt at
+  behavior level.
+metrics:
+  - name: api-signature
+    weight: 0.1
+  - name: logic-equivalence
+    weight: 0.4
+  - name: integration-points
+    weight: 0.3
+  - name: test-coverage
+    weight: 0.2

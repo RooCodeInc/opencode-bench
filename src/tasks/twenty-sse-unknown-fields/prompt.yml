@@ -1,0 +1,4 @@
+generated_at: 2026-07-06T16:54:00.801Z
+prompts:
+  - commit: d8ea406b805afdf39404e7f361bff535bedb42a3
+    prompt: Fix server-sent event handling so that unknown fields in optimistic cache updates are skipped rather than causing the entire event to be dropped. When SSE update events contain fields not recognized by the client's current metadata, filter out those unknown fields and log a warning, but still apply the rest of the event. Ensure metadata events are dispatched before optimistic updates to reduce the chance of encountering unknown fields. Include test coverage for the field detection logic covering known fields, unknown fields, relation join columns, and special keys like __typename.

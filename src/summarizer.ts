@@ -5,7 +5,9 @@ import { Eval } from "./eval.js";
 import { average } from "./util/math.js";
 
 export namespace Summarizer {
-  const MODEL_ID = "opencode/claude-sonnet-4-5";
+  const MODEL_ID =
+    process.env.OPENCODE_BENCH_SUMMARY_MODEL?.trim() ||
+    "opencode/claude-sonnet-4-5";
   export type RunsResult = Awaited<ReturnType<typeof summarizeRuns>>;
   export type TasksResult = Awaited<ReturnType<typeof summarizeTasks>>;
 

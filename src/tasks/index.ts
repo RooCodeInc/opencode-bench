@@ -17,7 +17,9 @@ export namespace Task {
   const TASK_PATH = __dirname;
   const SAMPLE_DATASET_NAME = "_sample";
   const SAMPLE_DATASET_PATH = join(TASK_PATH, SAMPLE_DATASET_NAME);
-  const GENERATE_MODEL_ID = "opencode/claude-sonnet-4-5";
+  const GENERATE_MODEL_ID =
+    process.env.OPENCODE_BENCH_GENERATE_MODEL?.trim() ||
+    "opencode/claude-sonnet-4-5";
   const definitionSchema = z.object({
     source: z.object({
       repo: z

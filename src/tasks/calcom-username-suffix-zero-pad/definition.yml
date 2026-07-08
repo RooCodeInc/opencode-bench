@@ -1,0 +1,18 @@
+source:
+  repo: calcom/cal.com
+  from: ebf696a991ceea768225a9cda457aa27fc4f0928
+  to: 1599dfd5158b20d098c1bf52e48b0d778f50e324
+context: >
+  When a requested username is taken, the suggested alternative appends a
+  numeric suffix that is not zero-padded, which is inconsistent with how
+  existing usernames are formatted. Ask for consistent zero-padded suffixes;
+  keep the prompt at behavior level.
+metrics:
+  - name: api-signature
+    weight: 0.1
+  - name: logic-equivalence
+    weight: 0.4
+  - name: integration-points
+    weight: 0.3
+  - name: test-coverage
+    weight: 0.2

@@ -10,7 +10,11 @@ type SupportedModel = NonNullable<GenerateObjectOptions["model"]>;
 
 const DEFAULT_BASE_URL = "https://opencode.ai/zen/v1";
 const OPENCODE_PREFIX = "opencode/";
-const API_KEY_ENV_VARS = ["OPENCODE_API_KEY"];
+// When judges are routed to a different OpenAI-compatible gateway via
+// OPENCODE_ZEN_BASE_URL (e.g. OpenRouter), accept that gateway's key too.
+const API_KEY_ENV_VARS = process.env.OPENCODE_ZEN_BASE_URL
+  ? ["OPENCODE_ZEN_API_KEY", "OPENCODE_API_KEY", "OPENROUTER_API_KEY"]
+  : ["OPENCODE_API_KEY"];
 
 type ProviderBundle = {
   openai: ReturnType<typeof createOpenAI>;
@@ -65,6 +69,9 @@ function ensureProviders(): ProviderBundle {
       apiKey,
       baseURL,
       name: "opencode",
+      // Send response_format json_schema so generateObject gets structured
+      // judge verdicts instead of free text that fails to parse.
+      supportsStructuredOutputs: true,
     }),
     anthropic: createAnthropic({
       apiKey,
@@ -87,6 +94,13 @@ function normalizeModelId(modelId: string): string {
 }
 
 function inferEndpoint(modelId: string): "responses" | "anthropic" | "chat" {
+  // Gateways like OpenRouter only expose chat completions; allow forcing the
+  // endpoint for all judge/generation calls.
+  const forced = process.env.OPENCODE_ZEN_ENDPOINT?.trim();
+  if (forced === "chat" || forced === "responses" || forced === "anthropic") {
+    return forced;
+  }
+
   const lower = modelId.toLowerCase();
 
   if (lower.startsWith("claude")) {

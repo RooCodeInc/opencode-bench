@@ -1,0 +1,285 @@
+diff --git a/packages/twenty-front/src/modules/object-record/utils/__tests__/getUnknownRecordInputFields.test.ts b/packages/twenty-front/src/modules/object-record/utils/__tests__/getUnknownRecordInputFields.test.ts
+new file mode 100644
+index 0000000000000..42b1bc823a9fb
+--- /dev/null
++++ b/packages/twenty-front/src/modules/object-record/utils/__tests__/getUnknownRecordInputFields.test.ts
+@@ -0,0 +1,52 @@
++import { getUnknownRecordInputFields } from '@/object-record/utils/getUnknownRecordInputFields';
++import { getMockObjectMetadataItemOrThrow } from '~/testing/utils/getMockObjectMetadataItemOrThrow';
++
++describe('getUnknownRecordInputFields', () => {
++  const personObjectMetadataItem = getMockObjectMetadataItemOrThrow('person');
++
++  it('should return an empty array when every field is known', () => {
++    const result = getUnknownRecordInputFields({
++      objectMetadataItem: personObjectMetadataItem,
++      recordInput: {
++        city: 'Paris',
++      },
++    });
++
++    expect(result).toEqual([]);
++  });
++
++  it('should ignore the __typename key', () => {
++    const result = getUnknownRecordInputFields({
++      objectMetadataItem: personObjectMetadataItem,
++      recordInput: {
++        __typename: 'Person',
++        city: 'Paris',
++      },
++    });
++
++    expect(result).toEqual([]);
++  });
++
++  it('should return fields absent from the object metadata', () => {
++    const result = getUnknownRecordInputFields({
++      objectMetadataItem: personObjectMetadataItem,
++      recordInput: {
++        city: 'Paris',
++        someFieldCreatedInAnotherTab: 'value',
++      },
++    });
++
++    expect(result).toEqual(['someFieldCreatedInAnotherTab']);
++  });
++
++  it('should accept relation join column names', () => {
++    const result = getUnknownRecordInputFields({
++      objectMetadataItem: personObjectMetadataItem,
++      recordInput: {
++        companyId: '20202020-0713-40a5-8216-82802401d33e',
++      },
++    });
++
++    expect(result).toEqual([]);
++  });
++});
+diff --git a/packages/twenty-front/src/modules/object-record/utils/computeOptimisticRecordFromInput.ts b/packages/twenty-front/src/modules/object-record/utils/computeOptimisticRecordFromInput.ts
+index efe8f99789874..9e311f41326e1 100644
+--- a/packages/twenty-front/src/modules/object-record/utils/computeOptimisticRecordFromInput.ts
++++ b/packages/twenty-front/src/modules/object-record/utils/computeOptimisticRecordFromInput.ts
+@@ -2,13 +2,11 @@ import { isNull, isUndefined } from '@sniptt/guards';
+ 
+ import { type CurrentWorkspaceMember } from '@/auth/states/currentWorkspaceMemberState';
+ import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
+-import { getFieldMetadataFromGqlField } from '@/object-record/cache/utils/getFieldMetadataFromGqlField';
+ import { getMorphRelationFromFieldMetadataAndGqlField } from '@/object-record/cache/utils/getMorphRelationFromFieldMetadataAndGqlField';
+ import {
+   getRecordFromCache,
+   type GetRecordFromCacheArgs,
+ } from '@/object-record/cache/utils/getRecordFromCache';
+-import { GRAPHQL_TYPENAME_KEY } from '@/object-record/constants/GraphqlTypenameKey';
+ import { type FieldActorValue } from '@/object-record/record-field/ui/types/FieldMetadata';
+ import { isFieldActor } from '@/object-record/record-field/ui/types/guards/isFieldActor';
+ import { isFieldMorphRelation } from '@/object-record/record-field/ui/types/guards/isFieldMorphRelation';
+@@ -17,6 +15,7 @@ import { isFieldUuid } from '@/object-record/record-field/ui/types/guards/isFiel
+ import { type ObjectRecord } from '@/object-record/types/ObjectRecord';
+ import { buildOptimisticActorFieldValueFromCurrentWorkspaceMember } from '@/object-record/utils/buildOptimisticActorFieldValueFromCurrentWorkspaceMember';
+ import { getForeignKeyNameFromRelationFieldName } from '@/object-record/utils/getForeignKeyNameFromRelationFieldName';
++import { getUnknownRecordInputFields } from '@/object-record/utils/getUnknownRecordInputFields';
+ import {
+   computeMorphRelationGqlFieldName,
+   computeRelationGqlFieldJoinColumnName,
+@@ -40,41 +39,11 @@ export const computeOptimisticRecordFromInput = ({
+   currentWorkspaceMember,
+   objectPermissionsByObjectMetadataId,
+ }: ComputeOptimisticCacheRecordInputArgs) => {
+-  const unknownRecordInputFields = Object.keys(recordInput).filter(
+-    (recordKey) => {
+-      const correspondingFieldMetadataItem = objectMetadataItem.fields.find(
+-        (field) => field.name === recordKey,
+-      );
+-
+-      const potentialRelationJoinColumnNameFieldMetadataItem =
+-        objectMetadataItem.fields.find(
+-          (field) =>
+-            field.type === FieldMetadataType.RELATION &&
+-            computeRelationGqlFieldJoinColumnName({ name: field.name }) ===
+-              recordKey,
+-        );
+-
+-      const potentialMorphRelationJoinColumnNameFieldMetadataItem =
+-        objectMetadataItem.fields.find((field) => {
+-          if (!isFieldMorphRelation(field)) return false;
+-
+-          return isDefined(
+-            getFieldMetadataFromGqlField({
+-              objectMetadataItem,
+-              gqlField: recordKey,
+-            }),
+-          );
+-        });
+-
+-      const isUnknownField =
+-        !isDefined(correspondingFieldMetadataItem) &&
+-        !isDefined(potentialRelationJoinColumnNameFieldMetadataItem) &&
+-        !isDefined(potentialMorphRelationJoinColumnNameFieldMetadataItem);
++  const unknownRecordInputFields = getUnknownRecordInputFields({
++    objectMetadataItem,
++    recordInput,
++  });
+ 
+-      const isTypenameField = recordKey === GRAPHQL_TYPENAME_KEY;
+-      return isUnknownField && !isTypenameField;
+-    },
+-  );
+   if (unknownRecordInputFields.length > 0) {
+     throw new Error(
+       `Should never occur, encountered unknown fields ${unknownRecordInputFields.join(', ')} in objectMetadataItem ${objectMetadataItem.nameSingular}`,
+diff --git a/packages/twenty-front/src/modules/object-record/utils/getUnknownRecordInputFields.ts b/packages/twenty-front/src/modules/object-record/utils/getUnknownRecordInputFields.ts
+new file mode 100644
+index 0000000000000..9f53a3d2f643a
+--- /dev/null
++++ b/packages/twenty-front/src/modules/object-record/utils/getUnknownRecordInputFields.ts
+@@ -0,0 +1,53 @@
++import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
++import { getFieldMetadataFromGqlField } from '@/object-record/cache/utils/getFieldMetadataFromGqlField';
++import { GRAPHQL_TYPENAME_KEY } from '@/object-record/constants/GraphqlTypenameKey';
++import { isFieldMorphRelation } from '@/object-record/record-field/ui/types/guards/isFieldMorphRelation';
++import { type ObjectRecord } from '@/object-record/types/ObjectRecord';
++import {
++  computeRelationGqlFieldJoinColumnName,
++  isDefined,
++} from 'twenty-shared/utils';
++import { FieldMetadataType } from '~/generated-metadata/graphql';
++
++export const getUnknownRecordInputFields = ({
++  objectMetadataItem,
++  recordInput,
++}: {
++  objectMetadataItem: EnrichedObjectMetadataItem;
++  recordInput: Partial<ObjectRecord>;
++}): string[] => {
++  return Object.keys(recordInput).filter((recordKey) => {
++    const correspondingFieldMetadataItem = objectMetadataItem.fields.find(
++      (field) => field.name === recordKey,
++    );
++
++    const potentialRelationJoinColumnNameFieldMetadataItem =
++      objectMetadataItem.fields.find(
++        (field) =>
++          field.type === FieldMetadataType.RELATION &&
++          computeRelationGqlFieldJoinColumnName({ name: field.name }) ===
++            recordKey,
++      );
++
++    const potentialMorphRelationJoinColumnNameFieldMetadataItem =
++      objectMetadataItem.fields.find((field) => {
++        if (!isFieldMorphRelation(field)) return false;
++
++        return isDefined(
++          getFieldMetadataFromGqlField({
++            objectMetadataItem,
++            gqlField: recordKey,
++          }),
++        );
++      });
++
++    const isUnknownField =
++      !isDefined(correspondingFieldMetadataItem) &&
++      !isDefined(potentialRelationJoinColumnNameFieldMetadataItem) &&
++      !isDefined(potentialMorphRelationJoinColumnNameFieldMetadataItem);
++
++    const isTypenameField = recordKey === GRAPHQL_TYPENAME_KEY;
++
++    return isUnknownField && !isTypenameField;
++  });
++};
+diff --git a/packages/twenty-front/src/modules/sse-db-event/hooks/useTriggerEventStreamCreation.ts b/packages/twenty-front/src/modules/sse-db-event/hooks/useTriggerEventStreamCreation.ts
+index f3a324ccbfc18..d15e0a0d922eb 100644
+--- a/packages/twenty-front/src/modules/sse-db-event/hooks/useTriggerEventStreamCreation.ts
++++ b/packages/twenty-front/src/modules/sse-db-event/hooks/useTriggerEventStreamCreation.ts
+@@ -123,6 +123,8 @@ export const useTriggerEventStreamCreation = () => {
+             (item) => item.objectRecordEvent,
+           );
+ 
++          dispatchMetadataEventsFromSseToBrowserEvents(metadataEvents);
++
+           triggerOptimisticEffectFromSseEvents({
+             objectRecordEvents,
+           });
+@@ -130,8 +132,6 @@ export const useTriggerEventStreamCreation = () => {
+           dispatchObjectRecordEventsFromSseToBrowserEvents(
+             objectRecordEventsWithQueryIds,
+           );
+-
+-          dispatchMetadataEventsFromSseToBrowserEvents(metadataEvents);
+         },
+         error: (error) => {
+           captureException(error);
+@@ -184,6 +184,11 @@ export const useTriggerEventStreamCreation = () => {
+                   },
+                 );
+ 
++                const metadataEvents =
++                  result?.data?.onEventSubscription?.metadataEvents ?? [];
++
++                dispatchMetadataEventsFromSseToBrowserEvents(metadataEvents);
++
+                 triggerOptimisticEffectFromSseEvents({
+                   objectRecordEvents,
+                 });
+@@ -191,11 +196,6 @@ export const useTriggerEventStreamCreation = () => {
+                 dispatchObjectRecordEventsFromSseToBrowserEvents(
+                   objectRecordEventsWithQueryIds,
+                 );
+-
+-                const metadataEvents =
+-                  result?.data?.onEventSubscription?.metadataEvents ?? [];
+-
+-                dispatchMetadataEventsFromSseToBrowserEvents(metadataEvents);
+               }
+             }
+           } catch (error) {
+diff --git a/packages/twenty-front/src/modules/sse-db-event/hooks/useTriggerOptimisticEffectFromSseUpdateEvents.ts b/packages/twenty-front/src/modules/sse-db-event/hooks/useTriggerOptimisticEffectFromSseUpdateEvents.ts
+index 5b0408b845913..6862a254c8f5a 100644
+--- a/packages/twenty-front/src/modules/sse-db-event/hooks/useTriggerOptimisticEffectFromSseUpdateEvents.ts
++++ b/packages/twenty-front/src/modules/sse-db-event/hooks/useTriggerOptimisticEffectFromSseUpdateEvents.ts
+@@ -11,6 +11,8 @@ import { useObjectPermissions } from '@/object-record/hooks/useObjectPermissions
+ import { useRefetchAggregateQueriesForObjectMetadataItem } from '@/object-record/hooks/useRefetchAggregateQueriesForObjectMetadataItem';
+ import { useUpsertRecordsInStore } from '@/object-record/record-store/hooks/useUpsertRecordsInStore';
+ import { computeOptimisticRecordFromInput } from '@/object-record/utils/computeOptimisticRecordFromInput';
++import { getUnknownRecordInputFields } from '@/object-record/utils/getUnknownRecordInputFields';
++import { captureMessage } from '@sentry/react';
+ import { useCallback } from 'react';
+ import { isDefined, isNonEmptyArray } from 'twenty-shared/utils';
+ import {
+@@ -39,12 +41,34 @@ export const useTriggerOptimisticEffectFromSseUpdateEvents = () => {
+       });
+ 
+       for (const updateEvent of updateEvents) {
+-        const updatedRecord = updateEvent.properties.after;
++        const recordFromEvent = updateEvent.properties.after;
+ 
+-        if (!isDefined(updatedRecord)) {
++        if (!isDefined(recordFromEvent)) {
+           continue;
+         }
+ 
++        const unknownRecordInputFields = getUnknownRecordInputFields({
++          objectMetadataItem,
++          recordInput: recordFromEvent,
++        });
++
++        if (unknownRecordInputFields.length > 0) {
++          captureMessage(
++            `SSE update event for ${objectMetadataItem.nameSingular} carried fields unknown to this tab's metadata: ${unknownRecordInputFields.join(', ')}`,
++            'warning',
++          );
++        }
++
++        const updatedRecord =
++          unknownRecordInputFields.length > 0
++            ? Object.fromEntries(
++                Object.entries(recordFromEvent).filter(
++                  ([recordKey]) =>
++                    !unknownRecordInputFields.includes(recordKey),
++                ),
++              )
++            : recordFromEvent;
++
+         const computedOptimisticRecord = {
+           ...computeOptimisticRecordFromInput({
+             cache: apolloCoreClient.cache,

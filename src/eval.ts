@@ -26,7 +26,11 @@ export namespace Eval {
       logger: Logger.Instance;
     },
   ) {
-    const timeoutMins = 20;
+    // The timeout covers the whole episode including judging; slow judge
+    // models can need more headroom than upstream's 20 minutes.
+    const timeoutMins =
+      Number.parseInt(process.env.OPENCODE_BENCH_EPISODE_TIMEOUT_MINS ?? "", 10) ||
+      20;
     opts.logger.log(`Starting episode with ${timeoutMins}min timeout...`);
     return await withRetries(
       () => runOnce(agentName, modelId, taskId, { logger: opts.logger }),
@@ -93,8 +97,43 @@ export namespace Eval {
 
       opts.logger.log(`Scoring...`);
       await finalizeChanges(task.source.from);
-      const diff = await generateDiff(task.source.from);
+
+      // An empty work tree at scoring time is a legitimate submission that
+      // scores 0 (the agent shipped nothing within its budget) — throwing
+      // here would burn full retries on a deterministic outcome.
+      let diff = "";
+      try {
+        diff = await generateDiff(task.source.from);
+      } catch {
+        opts.logger.log(
+          "No changes to score; recording a zero-score episode without judging.",
+        );
+      }
+
       const allScores = [];
+      if (diff.length === 0) {
+        for (const { name, weight } of task.metrics) {
+          allScores.push({
+            criterion: name,
+            weight,
+            average: 0,
+            variance: 0,
+            judges: [],
+          });
+        }
+        return {
+          task: taskId,
+          model: modelId,
+          agent: agentName,
+          diff,
+          score: { final: 0, base: 0, penalty: 0 },
+          scoreDetails: allScores,
+          actions,
+          usage,
+          duration,
+        };
+      }
+
       for (const { name, weight, args } of task.metrics) {
         const cl = opts.logger.child(`[metric ${name}]`);
         const afterResults = args
@@ -150,6 +189,9 @@ export namespace Eval {
         task: taskId,
         model: modelId,
         agent: agentName,
+        // Keep the agent's diff so result viewers can show it next to the
+        // reference diff the judges compared against.
+        diff,
         score: {
           final: score,
           base: weightedAvg,
@@ -249,9 +291,16 @@ export namespace Eval {
       const { object } = await generateObject({
         model: getZenLanguageModel(judge),
         schema: z.object({
-          score: z.number().refine((val) => val === 0 || val === 1, {
-            message: "Score must be binary: 0 (fail) or 1 (pass)",
-          }),
+          // No .max() here: Anthropic structured outputs reject maxItems;
+          // the prompt asks for 3-10 items and we truncate defensively below.
+          checklist: z
+            .array(
+              z.object({
+                item: z.string().min(1),
+                satisfied: z.boolean(),
+              }),
+            )
+            .min(1),
           rationale: z.string().min(1),
         }),
         system: c.systemPrompt,
@@ -260,17 +309,22 @@ export namespace Eval {
       });
       if (!object || typeof object !== "object")
         throw new Error("Score evaluators must return an object.");
-      if (typeof object.score !== "number")
-        throw new Error("Score evaluators must return a number.");
+      if (!Array.isArray(object.checklist) || object.checklist.length === 0)
+        throw new Error("Score evaluators must return a non-empty checklist.");
       if (typeof object.rationale !== "string" || object.rationale.length === 0)
         throw new Error("Score evaluators must include a rationale string.");
-      if (object.score < 0 || object.score > 1)
-        throw new Error(
-          "Score evaluators must return a score between 0 and 1.",
-        );
 
-      opts.logger.log("Judge result:", object);
-      return object;
+      // The score is the fraction of reference-derived expectations satisfied.
+      const checklist = object.checklist.slice(0, 15);
+      const satisfied = checklist.filter((c) => c.satisfied).length;
+      const result = {
+        score: satisfied / checklist.length,
+        rationale: object.rationale,
+        checklist,
+      };
+
+      opts.logger.log("Judge result:", result);
+      return result;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("Failed to judge score:", msg);

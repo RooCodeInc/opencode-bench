@@ -1,0 +1,4 @@
+generated_at: 2026-07-06T16:53:39.952Z
+prompts:
+  - commit: be4867cb33cab442b34ae4a619b04f3de7c13398
+    prompt: The /track/sale endpoint intermittently fails with duplicate-customer errors when the same external customer ID is tracked concurrently. Make the endpoint handle this gracefully so that concurrent requests succeed rather than fail. When a duplicate customer conflict occurs during direct sale tracking, recover by fetching the existing customer record instead of throwing an error. Ensure lead event tracking is properly deduplicated across concurrent requests to avoid duplicate lead events. Follow existing patterns for error handling and database operations. The solution should be production-ready and handle all edge cases around concurrent customer creation and lead event tracking.

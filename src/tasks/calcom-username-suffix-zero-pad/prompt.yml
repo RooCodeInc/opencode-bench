@@ -1,0 +1,4 @@
+generated_at: 2026-07-07T14:04:45.235Z
+prompts:
+  - commit: 1599dfd5158b20d098c1bf52e48b0d778f50e324
+    prompt: Fix the username suggestion logic in packages/lib/server/username.ts so the numeric suffix appended to a taken username is always zero-padded consistently (e.g. 'john001' rather than mixing widths like 'john42'). Currently the padding width is derived from the digit count of the random number itself, which produces inconsistent formatting for different suffix values. Ensure the suffix is always rendered with a fixed, consistent width regardless of the random number's magnitude, matching the existing username formatting convention used elsewhere. Add/update unit tests in username.test.ts covering generateUsernameSuggestion to verify the suffix is zero-padded correctly for the first available suffix as well as when collisions force a random suffix, including multi-digit random values, to confirm consistent padding across all cases.

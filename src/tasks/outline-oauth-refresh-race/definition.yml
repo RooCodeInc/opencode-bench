@@ -1,0 +1,18 @@
+source:
+  repo: outline/outline
+  from: 7b71aa53d2850a2e62b80f26facfdba667dccac7
+  to: 4c36bd83dee73ffc4fe41cdd0c68008e4d57a29b
+context: >
+  When multiple requests try to refresh the same OAuth access token at the
+  same time, the concurrent refresh attempts can end up revoking the grant
+  and logging the integration out. Ask for concurrent refreshes to be handled
+  safely; avoid naming the locking mechanism or files.
+metrics:
+  - name: api-signature
+    weight: 0.1
+  - name: logic-equivalence
+    weight: 0.4
+  - name: integration-points
+    weight: 0.3
+  - name: test-coverage
+    weight: 0.2

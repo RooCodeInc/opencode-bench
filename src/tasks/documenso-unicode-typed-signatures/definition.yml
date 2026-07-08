@@ -1,0 +1,17 @@
+source:
+  repo: documenso/documenso
+  from: 219db32fdf3c78089c97ccac377c08697443fa0e
+  to: 306e7fe5edad84e2508e4773b2d94fc5fc89a8c4
+context: >
+  Typed signatures render incorrectly when the signer's name uses non-Latin
+  characters. Ask for unicode names to render correctly in the generated
+  signature images; do not reveal which files or rendering approach to use.
+metrics:
+  - name: api-signature
+    weight: 0.1
+  - name: logic-equivalence
+    weight: 0.4
+  - name: integration-points
+    weight: 0.3
+  - name: test-coverage
+    weight: 0.2

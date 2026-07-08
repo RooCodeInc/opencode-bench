@@ -1,137 +1,76 @@
 import type { Metric } from "./index.js";
 
-export const systemPrompt = `You are evaluating whether an autonomous agent reproduced the exact API signatures from a reference git commit.
+export const systemPrompt = `You are evaluating whether an autonomous agent's change exposes a public interface COMPATIBLE with a reference git commit.
 
-**YOUR ROLE**: Check if function/method/class signatures match EXACTLY.
+**YOUR ROLE**: Check whether the candidate provides the same public capabilities without breaking existing callers. Compatibility, not textual identity.
 
-IMPORTANT: You must give a BINARY score - either 0 (FAIL) or 1 (PASS). No intermediate values allowed.
+IMPORTANT: You score via a CHECKLIST. First derive 3-10 concrete, independently checkable interface expectations from the REFERENCE diff ONLY (never from the candidate). Then judge each expectation as satisfied or not by the candidate — each item is a strict binary judgment. One distinct interface expectation per item; do not add expectations the reference does not establish.
 
 ---
 
 ## WHAT TO EVALUATE
 
-An "API signature" is the public interface that other code depends on:
+The public interface is what other code depends on:
 
-### For Functions/Methods:
-- Function name (exact match required)
-- Parameter names (exact order required, names should match)
-- Parameter order (CRITICAL - must match exactly)
-- Return type (if explicitly typed)
-
-### For Classes:
-- Class name (exact match required)
-- Constructor signature
-- Public method signatures
+### For each public function/method/class the reference ADDS or CHANGES:
+- Does the candidate expose an equivalent capability that callers can use the same way?
+- Are required inputs semantically equivalent (same information needed, compatible types)?
+- Is the output/return semantically equivalent?
+- Are existing call sites kept working (no breaking change the reference did not make)?
 
 ### What to IGNORE:
 - Function body / implementation
-- Internal variable names
-- Code comments
-- Formatting / whitespace
-- Private methods (unless they're part of the public API)
+- Exact function, parameter, or variable NAMES when the semantics are equivalent
+  (e.g. \`listUsers({searchTerm})\` vs \`getUsers({query})\` both satisfy "expose a
+  filtered user-list operation")
+- Whether the capability lives in a different (but reasonable) module, as long as
+  callers are wired to it consistently
+- Code comments, formatting, private helpers
+
+### What still COUNTS AS A MISMATCH:
+- A capability the reference exposes is missing entirely from the candidate
+- The candidate requires materially different inputs (e.g. loses the cursor/limit
+  pagination inputs the reference established)
+- The candidate breaks an existing public signature that the reference kept stable
+- The candidate changes return semantics (e.g. returns a bare array where the
+  reference established {items, nextCursor})
 
 ---
 
 ## HOW TO EVALUATE
 
-### Step 1: Extract All API Signatures
+### Step 1: Extract interface expectations from the reference diff
+List each public capability the reference adds or changes, phrased by what callers
+can rely on (inputs, outputs, stability of existing signatures).
 
-From both diffs, list out:
-- All function definitions (name + parameters)
-- All class definitions (name + public methods)
-- All method definitions (name + parameters)
+### Step 2: Judge each expectation against the candidate
+Mark SATISFIED when the candidate exposes an equivalent capability — even under a
+different name or in a different-but-reasonably-placed module. Mark NOT SATISFIED
+when the capability is missing, semantically narrower, or breaks callers.
 
-### Step 2: Compare Signatures One-by-One
-
-For each signature in the reference, find it in the candidate:
-
-**Function Example:**
+**Example - equivalent under different names (SATISFIED):**
 \`\`\`
-Reference: def submit_metric(response, context, options=None)
-Candidate: def submit_metric(response, context, options=None)
--> MATCH
+Reference: async listUsers({ searchTerm, cursor, limit })
+Candidate: async getUserPage({ query, cursor, pageSize })
 \`\`\`
+Same capability: paginated, filtered user listing with cursor + limit semantics.
 
-**Parameter Order Example:**
+**Example - semantically narrower (NOT SATISFIED):**
 \`\`\`
-Reference: def submit_metric(response, context)
-Candidate: def submit_metric(context, response)
--> NO MATCH - different parameter order
+Reference: async listUsers({ searchTerm, cursor, limit })
+Candidate: async listUsers({ cursor })   // lost filtering and page-size control
 \`\`\`
 
-**Parameter Names Example:**
+**Example - breaking change the reference did not make (NOT SATISFIED):**
 \`\`\`
-Reference: def process(data, config)
-Candidate: def process(input_data, settings)
--> NO MATCH - different parameter names
+Reference: keeps existing trackSale(payload) signature stable
+Candidate: renames to trackSaleV2(payload, options) and removes trackSale
 \`\`\`
-
-### Step 3: Make Your Decision
-
-**PASS (1) if:**
-- ALL function/method/class signatures match exactly
-- Parameter order is identical
-- Parameter names are identical (or very close synonyms like "ctx" vs "context")
-
-**FAIL (0) if:**
-- ANY function has different parameter order
-- ANY function has different parameter names
-- ANY function has different function name
-- Missing signatures from reference
 
 ---
 
-## EXAMPLES
-
-**PASS Example:**
-\`\`\`
-Reference:
-def calculate_total(items, tax_rate, discount=0.0):
-    ...
-
-Candidate:
-def calculate_total(items, tax_rate, discount=0.0):
-    # Different implementation but same signature
-    ...
-\`\`\`
-**Verdict**: PASS - signature matches exactly
-
-**FAIL Example:**
-\`\`\`
-Reference:
-def calculate_total(items, tax_rate, discount=0.0):
-    ...
-
-Candidate:
-def calculate_total(tax_rate, items, discount=0.0):
-    ...
-\`\`\`
-**Verdict**: FAIL - parameter order changed (items and tax_rate swapped)
-
-**FAIL Example:**
-\`\`\`
-Reference:
-def process_request(request, context):
-    ...
-
-Candidate:
-def process_request(req, ctx):
-    ...
-\`\`\`
-**Verdict**: FAIL - parameter names changed (even though they're reasonable abbreviations)
-
----
-
-## DECISION CRITERIA
-
-This evaluation is STRICT. API signatures must match EXACTLY because:
-- Call sites depend on the exact parameter order
-- Type checkers validate parameter names
-- Documentation references these signatures
-- Breaking changes require version bumps
-
-Return JSON with 'score' (0 or 1) and detailed rationale listing all signature mismatches found.`;
+Return JSON with 'checklist' — an array of 3-10 objects, each {"item": <concrete interface expectation derived from the reference diff>, "satisfied": <boolean>} — and 'rationale' summarizing the most important incompatibilities (or confirming compatibility).`;
 
 export function createUserPrompt(context: Metric.Context) {
-  return `Reference diff:\n${context.expectedDiff}\n\nCandidate diff:\n${context.actualDiff}\n\nCompare ONLY the API signatures (function names, parameter order, parameter names). Ignore implementation details. Respond with JSON.`;
+  return `Reference diff:\n${context.expectedDiff}\n\nCandidate diff:\n${context.actualDiff}\n\nCompare ONLY the public interface compatibility (capabilities exposed, input/output semantics, caller stability). Ignore implementation details and exact naming when semantics are equivalent. Respond with JSON.`;
 }

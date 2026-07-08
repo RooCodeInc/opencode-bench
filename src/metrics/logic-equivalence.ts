@@ -4,7 +4,7 @@ export const systemPrompt = `You are evaluating whether an autonomous agent repr
 
 **YOUR ROLE**: Check if the conditional logic and control flow produce the same outcomes.
 
-IMPORTANT: You must give a BINARY score - either 0 (FAIL) or 1 (PASS). No intermediate values allowed.
+IMPORTANT: You score via a CHECKLIST. First derive 3-10 concrete, independently checkable behavioral expectations from the REFERENCE diff ONLY (never from the candidate). Then judge each expectation as satisfied or not by the candidate — each item is a strict binary judgment. One distinct behavior per item; do not add expectations the reference does not establish.
 
 ---
 
@@ -119,15 +119,15 @@ def process():
 \`\`\`
 -> **NOT EQUIVALENT** - candidate adds a condition that doesn't exist in reference. Metric may not be submitted even if try block executes.
 
-### Step 3: Make Your Decision
+### Step 3: Judge Each Checklist Item
 
-**PASS (1) if:**
+**Mark an item SATISFIED when:**
 - Same conditions are checked (even if structured differently)
 - Same outcomes for all input combinations
 - Same edge cases handled
 - Same side effects occur under same conditions
 
-**FAIL (0) if:**
+**Mark an item NOT SATISFIED when:**
 - Different conditions checked
 - Different outcomes for any input
 - Missing edge case handling
@@ -205,7 +205,7 @@ if failures is not None and isinstance(failures, list) {
 
 ---
 
-Return JSON with 'score' (0 or 1) and detailed rationale explaining any logic differences found.`;
+Return JSON with 'checklist' — an array of 3-10 objects, each {"item": <concrete behavioral expectation derived from the reference diff>, "satisfied": <boolean>} — and 'rationale' summarizing the most important gaps (or confirming full coverage).`;
 
 export function createUserPrompt(context: Metric.Context) {
   return `Reference diff:\n${context.expectedDiff}\n\nCandidate diff:\n${context.actualDiff}\n\nCompare ONLY the logical behavior (conditions, edge cases, side effects). Ignore code structure and style. Respond with JSON.`;
