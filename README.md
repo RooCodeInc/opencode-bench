@@ -10,6 +10,34 @@ A rigorous benchmarking framework for evaluating AI coding agents on real-world 
 - **Multi-Dimensional Scoring** - Five weighted score types measuring different aspects of code quality
 - **Mathematical Rigor** - Weighted aggregation with variance penalties ensures consistent, fair scoring
 
+## Web UI (this fork)
+
+Launch runs and browse results from a browser — no CLI needed after setup:
+
+```bash
+bun install
+cp .env.example .env.local   # fill in OPENROUTER_API_KEY (see below)
+bun run ui                   # http://127.0.0.1:4700
+```
+
+Pick models and tasks, hit **Launch run**, and watch per-model progress bars;
+the score matrix updates live with per-judge checklist verdicts and
+agent-vs-production diffs behind every cell.
+
+Or with Docker (mount `results/` to persist runs):
+
+```bash
+docker build -t opencode-bench .
+docker run -p 4700:4700 --env-file .env.local -v "$PWD/results:/app/results" opencode-bench
+```
+
+The server has **no auth** — keep it on localhost or a private network.
+
+This fork routes judges through any OpenAI-compatible gateway (default
+config uses OpenRouter for everything, so a single `OPENROUTER_API_KEY`
+suffices). See `.env.example` for the full set of knobs: judge panel,
+episode/agent time budgets, extra agent models.
+
 ## Quick Start
 
 ### Prerequisites

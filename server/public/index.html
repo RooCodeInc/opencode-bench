@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>opencode-bench</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a23; --border: #262b38; --text: #e2e6ef;
+    --muted: #8b93a7; --accent: #6ea8fe; --good: #2fbf71; --mid: #e2b93b; --bad: #e05252;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 1rem/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 1.5rem 1.5rem 4rem; }
+  h1 { font-size: 1.3rem; margin: 0; }
+  h2 { font-size: 1rem; margin: 0 0 .6rem; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .06em; font-weight: 600; }
+  .topbar { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+  .topbar .spend { margin-left: auto; color: var(--muted); font-size: .85rem;
+    font-variant-numeric: tabular-nums; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
+  .launcher { display: grid; grid-template-columns: 1fr 1fr auto; gap: 1.25rem; }
+  @media (max-width: 900px) { .launcher { grid-template-columns: 1fr; } }
+  .field label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: .35rem; }
+  textarea, input[type=number] { width: 100%; background: #10131b; color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: .5rem .6rem;
+    font: .85rem/1.4 ui-monospace, monospace; }
+  textarea { resize: vertical; min-height: 7.5rem; }
+  .tasklist { display: flex; flex-direction: column; gap: .25rem; max-height: 12rem;
+    overflow-y: auto; font-size: .85rem; }
+  .tasklist label { display: flex; gap: .5rem; align-items: center; color: var(--text); }
+  .tasklist .repo { color: var(--muted); font-size: .75rem; }
+  .launch-col { display: flex; flex-direction: column; gap: .75rem; justify-content: flex-end; }
+  button { background: var(--accent); color: #0b0d12; font-weight: 600; border: 0;
+    border-radius: 6px; padding: .55rem 1.1rem; cursor: pointer; font-size: .9rem; }
+  button.secondary { background: transparent; color: var(--bad); border: 1px solid var(--bad);
+    padding: .15rem .6rem; font-size: .75rem; }
+  button:disabled { opacity: .5; cursor: default; }
+  .runrow { display: flex; gap: 1rem; align-items: center; font-size: .85rem;
+    padding: .35rem 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .runrow:first-of-type { border-top: 0; }
+  .runrow .model { min-width: 16rem; }
+  .bar { flex: 1 1 8rem; height: 8px; background: #10131b; border-radius: 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+  .status { font-size: .75rem; color: var(--muted); min-width: 4.5rem; }
+  .status.done { color: var(--good); }
+  .status.failed, .status.stopped { color: var(--bad); }
+  .logtail { flex-basis: 100%; color: var(--muted); font: .7rem/1.3 ui-monospace, monospace;
+    white-space: pre-wrap; overflow-wrap: anywhere; }
+  table.matrix { border-collapse: collapse; width: 100%; }
+  .matrix th, .matrix td { border: 1px solid var(--border); padding: .45rem .6rem; text-align: center; }
+  .matrix th { background: var(--panel); font-weight: 600; font-size: .8rem; }
+  .matrix th.task, .matrix td.task { text-align: left; }
+  .matrix td.task { color: var(--muted); font-size: .82rem; }
+  .cell { cursor: pointer; font-variant-numeric: tabular-nums; }
+  .cell:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .cell .eps { display: block; color: var(--muted); font-size: .68rem; }
+  .detail h3 { font-size: 1rem; margin: 0 0 .5rem; }
+  .ep { border-top: 1px solid var(--border); padding: .7rem 0; }
+  .ep-head { display: flex; gap: 1.25rem; flex-wrap: wrap; font-size: .85rem; color: var(--muted); }
+  .ep-head b { color: var(--text); }
+  .crit { margin: .55rem 0 0 .5rem; }
+  .crit-row { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; font-size: .85rem; }
+  .crit-name { min-width: 10.5rem; }
+  .judge { border: 1px solid var(--border); border-radius: 999px; padding: 0 .55rem;
+    font-size: .75rem; cursor: pointer; background: transparent; color: var(--text); }
+  .judge.pass { border-color: var(--good); color: var(--good); }
+  .judge.fail { border-color: var(--bad); color: var(--bad); }
+  .rationale { background: #10131b; border-left: 3px solid var(--accent); margin: .4rem 0 .4rem .5rem;
+    padding: .5rem .75rem; font-size: .82rem; color: var(--muted); white-space: pre-wrap; }
+  details.diffs { margin-top: .6rem; }
+  details.diffs summary { cursor: pointer; color: var(--accent); font-size: .85rem; }
+  .diff-cols { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .5rem; }
+  @media (max-width: 900px) { .diff-cols { grid-template-columns: 1fr; } }
+  .diff-col h4 { font-size: .78rem; margin: 0 0 .3rem; color: var(--muted); }
+  pre.diff { background: #10131b; border: 1px solid var(--border); border-radius: 6px;
+    padding: .6rem; overflow-x: auto; font-size: .72rem; max-height: 420px; margin: 0; }
+  .legend { color: var(--muted); font-size: .78rem; margin: .5rem 0 1rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <h1>opencode-bench</h1>
+    <span style="color:var(--muted);font-size:.85rem">agents vs production commits, judged by model panel</span>
+    <span class="spend" id="spend"></span>
+  </div>
+
+  <div class="panel">
+    <h2>New run</h2>
+    <div class="launcher">
+      <div class="field">
+        <label>Models (one per line, provider/model)</label>
+        <textarea id="models"></textarea>
+      </div>
+      <div class="field">
+        <label>Tasks</label>
+        <div class="tasklist" id="tasks"></div>
+      </div>
+      <div class="launch-col">
+        <div class="field">
+          <label>Episodes per cell</label>
+          <input type="number" id="episodes" value="3" min="1" max="10">
+        </div>
+        <button id="launch">Launch run</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="runs-panel" style="display:none">
+    <h2>Runs</h2>
+    <div id="runs"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Results</h2>
+    <div class="legend">Cells show mean score as % of the task's max, across all stored episodes.
+      Click a cell for per-episode judge checklists and the agent-vs-production diff.
+      Auto-refreshes every 10s.</div>
+    <table class="matrix" id="matrix"></table>
+  </div>
+
+  <div class="panel detail" id="detail" style="display:none"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+let TASKS = [], RESULTS = [], SELECTED = null;
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// ---- launcher ----
+async function initLauncher() {
+  TASKS = await api("/api/tasks");
+  $("tasks").innerHTML = TASKS.map(t =>
+    `<label><input type="checkbox" value="${t.name}" checked>
+     <span>${t.name}</span> <span class="repo">${t.repo}</span></label>`).join("");
+  const models = await api("/api/models");
+  $("models").value = models.join("\n");
+}
+
+$("launch").onclick = async () => {
+  const models = $("models").value.split("\n").map(s => s.trim()).filter(Boolean);
+  const tasks = [...$("tasks").querySelectorAll("input:checked")].map(i => i.value);
+  const episodes = Number($("episodes").value) || 3;
+  $("launch").disabled = true;
+  try {
+    await api("/api/runs", { method: "POST",
+      headers: {"content-type": "application/json"},
+      body: JSON.stringify({ models, tasks, episodes }) });
+    await refreshRuns();
+  } catch (e) { alert(e.message); }
+  $("launch").disabled = false;
+};
+
+// ---- runs ----
+async function refreshRuns() {
+  const runs = await api("/api/runs");
+  $("runs-panel").style.display = runs.length ? "" : "none";
+  $("runs").innerHTML = runs.map(run => {
+    const active = run.shards.some(s => s.status === "running" || s.status === "pending");
+    const head = `<div class="runrow"><b>${run.id}</b>
+      <span style="color:var(--muted)">${run.tasks.length} tasks × ${run.episodes} ep · started ${new Date(run.startedAt).toLocaleTimeString()}</span>
+      ${active ? `<button class="secondary" onclick="stopRun('${run.id}')">stop</button>` : ""}</div>`;
+    const rows = run.shards.map(s => {
+      const pct = s.total ? Math.round(100 * s.done / s.total) : 0;
+      return `<div class="runrow">
+        <span class="model">${esc(s.model)}</span>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+        <span style="font-variant-numeric:tabular-nums">${s.done}/${s.total}</span>
+        <span class="status ${s.status}">${s.status}</span>
+        ${s.status === "running" && s.logTail ? `<span class="logtail">${esc(s.logTail)}</span>` : ""}
+      </div>`;
+    }).join("");
+    return head + rows;
+  }).join("<hr style='border:0;border-top:1px solid var(--border)'>");
+}
+
+window.stopRun = async (id) => { await api(`/api/runs/${id}/stop`, {method:"POST"}); refreshRuns(); };
+
+// ---- results matrix ----
+function taskMax(name) {
+  const t = TASKS.find(t => t.name === name);
+  return t ? t.maxScore : 1;
+}
+
+async function refreshResults() {
+  RESULTS = await api("/api/results");
+  const models = [...new Set(RESULTS.map(r => r.model))];
+  const tasks = [...new Set(RESULTS.map(r => r.task))].sort();
+  const cell = (m, t) => RESULTS.filter(r => r.model === m && r.task === t);
+  const pct = (m, t) => {
+    const rs = cell(m, t);
+    if (!rs.length) return null;
+    return rs.reduce((s, r) => s + r.score.final, 0) / rs.length / taskMax(t);
+  };
+  const color = (p) => p == null ? "transparent" : `hsl(${Math.round(p*120)} 55% 22%)`;
+  // order models by average desc
+  const avg = (m) => {
+    const ps = tasks.map(t => pct(m, t)).filter(p => p != null);
+    return ps.length ? ps.reduce((a,b) => a+b, 0) / ps.length : 0;
+  };
+  models.sort((a, b) => avg(b) - avg(a));
+
+  let html = "<tr><th class='task'>task</th>" + models.map(m =>
+    `<th>${esc(m.replace("openrouter/", ""))}</th>`).join("") + "</tr>";
+  html += tasks.map(t => "<tr><td class='task'>" + esc(t) + "</td>" + models.map(m => {
+    const p = pct(m, t), rs = cell(m, t);
+    if (p == null) return "<td>–</td>";
+    const cost = rs.reduce((s, r) => s + (r.usage?.cost ?? 0), 0);
+    return `<td class="cell" style="background:${color(p)}"
+      onclick="showDetail('${esc(m)}','${esc(t)}')">${(p*100).toFixed(0)}%
+      <span class="eps">${rs.length} ep · $${cost.toFixed(2)}</span></td>`;
+  }).join("") + "</tr>").join("");
+  html += "<tr><td class='task'><b>model average</b></td>" + models.map(m =>
+    `<td style="background:${color(avg(m))}"><b>${(avg(m)*100).toFixed(0)}%</b></td>`).join("") + "</tr>";
+  $("matrix").innerHTML = html;
+}
+
+// ---- detail ----
+window.showDetail = async (model, task) => {
+  const rows = await api(`/api/cell?model=${encodeURIComponent(model)}&task=${encodeURIComponent(task)}`);
+  let refDiff = "";
+  try { refDiff = await (await fetch(`/api/reference-diff/${task}`)).text(); } catch {}
+  const el = $("detail");
+  el.style.display = "";
+  el.innerHTML = `<h3>${esc(task)} · ${esc(model)}</h3>` + rows.map((r, i) => {
+    const crits = r.scoreDetails.map((s, si) => {
+      const judges = s.judges.map((j, ji) =>
+        `<button class="judge ${j.score >= 0.5 ? "pass" : "fail"}"
+          onclick="toggleRat(${i},${si},${ji})">${esc(j.judge.split("/").pop())} ${j.score.toFixed(2)}</button>`
+      ).join(" ");
+      const rats = s.judges.map((j, ji) => {
+        const items = (j.checklist || []).map(c =>
+          `<div>${c.satisfied ? "✓" : "✗"} ${esc(c.item)}</div>`).join("");
+        return `<div class="rationale" id="rat-${i}-${si}-${ji}" style="display:none">
+          <b>${esc(j.judge)}:</b> ${esc(j.rationale || "(no rationale)")}
+          ${items ? `<div style="margin-top:.4rem">${items}</div>` : ""}</div>`;
+      }).join("");
+      return `<div class="crit"><div class="crit-row">
+        <span class="crit-name">${esc(s.criterion)} (w ${s.weight})</span>${judges}
+        ${s.variance > 0.02 ? `<span style="color:var(--mid)">disagreement</span>` : ""}
+        </div>${rats}</div>`;
+    }).join("");
+    const diffs = `<details class="diffs"><summary>agent diff vs production diff</summary>
+      <div class="diff-cols">
+        <div class="diff-col"><h4>agent (${r.diffChars ?? (r.diff||"").length} chars)</h4>
+          <pre class="diff">${esc(r.diff || "(empty submission)")}</pre></div>
+        <div class="diff-col"><h4>production (reference)</h4>
+          <pre class="diff">${esc(refDiff || "(unavailable)")}</pre></div>
+      </div></details>`;
+    return `<div class="ep"><div class="ep-head">
+      <span>episode <b>${r.episode ?? 1}</b></span>
+      <span>score <b>${r.score.final.toFixed(3)}</b> / ${taskMax(task).toFixed(1)}
+        (base ${r.score.base.toFixed(3)} − penalty ${r.score.penalty.toFixed(3)})</span>
+      <span>cost <b>$${(r.usage?.cost ?? 0).toFixed(2)}</b></span>
+      <span>duration <b>${Math.round((r.duration ?? 0)/1000)}s</b></span>
+      </div>${crits}${diffs}</div>`;
+  }).join("");
+  el.scrollIntoView({ behavior: "smooth" });
+};
+
+window.toggleRat = (i, si, ji) => {
+  const el = $(`rat-${i}-${si}-${ji}`);
+  el.style.display = el.style.display === "none" ? "block" : "none";
+};
+
+// ---- spend ----
+async function refreshSpend() {
+  try {
+    const { usage } = await api("/api/spend");
+    $("spend").textContent = usage != null ? `key usage: $${usage.toFixed(2)}` : "";
+  } catch {}
+}
+
+// ---- boot ----
+initLauncher();
+refreshResults(); refreshRuns(); refreshSpend();
+setInterval(refreshResults, 10000);
+setInterval(refreshRuns, 5000);
+setInterval(refreshSpend, 30000);
+</script>
+</body>
+</html>
